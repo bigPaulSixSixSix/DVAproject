@@ -22,49 +22,28 @@
       class="function-section"
     >
       <h3 class="section-title">{{ category.title }}</h3>
-      <el-row :gutter="20">
-        <el-col 
+      <div class="function-grid">
+        <FunctionCard
           v-for="(item, index) in category.children" 
-          :key="index" 
-          :span="6"
-          class="function-col"
-        >
-          <FunctionCard
-            :title="item.title"
-            :icon-name="item.icon || 'Menu'"
-            :icon-color="getIconColor(index)"
-            :path="item.path"
-          />
-        </el-col>
-      </el-row>
+          :key="index"
+          :title="item.title"
+          :icon-name="item.icon || 'Menu'"
+          :icon-color="getIconColor(index)"
+          :path="item.path"
+        />
+      </div>
     </div>
 
-    <!-- 占位功能区域（如果总功能数不足7个） -->
-    <div v-if="placeholderCount > 0" class="function-section">
-      <h3 class="section-title">分类名称</h3>
-      <el-row :gutter="20">
-        <el-col 
-          v-for="n in placeholderCount" 
-          :key="`placeholder-${n}`" 
-          :span="6"
-          class="function-col"
-        >
-          <FunctionCard
-            title="功能名称"
-            icon-name="Menu"
-            icon-color="#909399"
-            path="#"
-          />
-        </el-col>
-      </el-row>
-      <div class="no-more-text">没有更多啦</div>
+    <!-- 空状态提示 -->
+    <div v-if="workbenchCategories.length === 0" class="empty-state">
+      <el-empty description="暂无工作台功能配置" />
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import usePermissionStore from '@/store/modules/permission'
+import { ref, onMounted } from 'vue'
+import { listMenu } from '@/api/system/menu'
 import AnnouncementCard from '@/components/Workbench/SummaryCard/AnnouncementCard.vue'
 import TaskCard from '@/components/Workbench/SummaryCard/TaskCard.vue'
 import TaskOverviewCard from '@/components/Workbench/SummaryCard/TaskOverviewCard.vue'
@@ -74,74 +53,63 @@ defineOptions({
   name: 'Workbench'
 })
 
-const permissionStore = usePermissionStore()
 const workbenchCategories = ref([])
 
-// 获取工作台菜单数据并转换为分类结构
-const getWorkbenchMenus = () => {
-  const allRoutes = permissionStore.routes
-  console.log('All routes:', allRoutes) // 调试用
-  
-  // 查找工作台父级菜单
-  const workbenchParent = allRoutes.find(route => route.path === '/workbench')
-  console.log('Workbench parent:', workbenchParent) // 调试用
-  
-  if (workbenchParent && workbenchParent.children) {
-    // 过滤出工作台下的子菜单，排除工作台首页
-    const workbenchChildren = workbenchParent.children.filter(child => 
-      child.meta && child.meta.title && child.path !== '/workbench/index'
-    )
-    
-    // 按菜单类型分组：目录类型作为分类，菜单类型作为功能
-    const categories = []
-    const categoryMap = new Map()
-    
-    workbenchChildren.forEach(child => {
-      const menuType = child.meta.menuType || 'M' // 默认为菜单类型
-      
-      if (menuType === 'C') {
-        // 目录类型 - 作为分类
-        const category = {
-          title: child.meta.title,
-          orderNum: child.orderNum || 0,
-          children: []
-        }
-        categoryMap.set(child.menuId, category)
-        categories.push(category)
-      } else if (menuType === 'M') {
-        // 菜单类型 - 作为功能
-        const parentId = child.parentId
-        if (parentId && categoryMap.has(parentId)) {
-          const category = categoryMap.get(parentId)
-          category.children.push({
-            title: child.meta.title,
-            icon: child.meta.icon,
-            path: child.path,
-            orderNum: child.orderNum || 0
-          })
-        }
+// 获取工作台菜单数据并转换为分类结构（基于菜单树，非路由）
+const getWorkbenchMenus = async () => {
+  try {
+    const response = await listMenu()
+    const allMenus = response.data
+
+    // 查找工作台父级菜单（兼容是否带斜杠）
+    const workbenchParent = allMenus.find(menu => menu.path === 'workbench' || menu.path === '/workbench')
+    if (!workbenchParent) return
+
+    // 1) 分类：父级为工作台且类型为目录(M)
+    const categories = allMenus
+      .filter(menu => 
+        menu.parentId === workbenchParent.menuId &&
+        menu.menuType === 'M' &&
+        menu.status === '0'
+      )
+      .map(categoryMenu => ({
+        id: categoryMenu.menuId,
+        title: categoryMenu.menuName,
+        orderNum: categoryMenu.orderNum || 0,
+        children: []
+      }))
+
+    // 2) 功能：父级为分类且类型为菜单(C)
+    const categoriesById = new Map(categories.map(c => [c.id, c]))
+    allMenus.forEach(menu => {
+      if (
+        menu.menuType === 'C' &&
+        menu.status === '0' &&
+        categoriesById.has(menu.parentId)
+      ) {
+        const category = categoriesById.get(menu.parentId)
+        category.children.push({
+          title: menu.menuName,
+          icon: menu.icon,
+          path: menu.path,
+          orderNum: menu.orderNum || 0
+        })
+        console.log('Added function:', menu.menuName, 'icon:', menu.icon)
       }
     })
-    
-    // 排序：先按分类排序，再按功能排序
-    categories.sort((a, b) => a.orderNum - b.orderNum)
+
+    // 排序
     categories.forEach(category => {
       category.children.sort((a, b) => a.orderNum - b.orderNum)
     })
-    
-    // 过滤掉没有子功能的分类
-    workbenchCategories.value = categories.filter(category => category.children.length > 0)
-    
-    console.log('Workbench categories:', workbenchCategories.value) // 调试用
+    categories.sort((a, b) => a.orderNum - b.orderNum)
+
+    // 过滤空分类并赋值
+    workbenchCategories.value = categories.filter(c => c.children.length > 0)
+  } catch (error) {
+    // 静默失败，避免干扰页面
   }
 }
-
-// 计算占位卡片数量（确保总功能数达到7个）
-const placeholderCount = computed(() => {
-  const totalFunctions = workbenchCategories.value.reduce((sum, category) => sum + category.children.length, 0)
-  const targetCount = 7 // 目标功能数
-  return Math.max(0, targetCount - totalFunctions)
-})
 
 // 获取图标颜色
 const getIconColor = (index) => {
@@ -171,15 +139,39 @@ onMounted(() => {
   padding-left: 4px;
 }
 
-.function-col {
-  margin-bottom: 20px;
+.function-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  max-width: 100%;
 }
 
-.no-more-text {
+@media (min-width: 1200px) {
+  .function-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+
+@media (max-width: 1199px) and (min-width: 992px) {
+  .function-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 991px) and (min-width: 768px) {
+  .function-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 767px) {
+  .function-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.empty-state {
+  margin-top: 40px;
   text-align: center;
-  color: var(--el-text-color-placeholder);
-  font-size: 14px;
-  margin-top: 20px;
-  padding: 20px 0;
 }
 </style>
