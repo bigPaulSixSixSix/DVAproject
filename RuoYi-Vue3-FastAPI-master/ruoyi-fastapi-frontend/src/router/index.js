@@ -89,21 +89,6 @@ export const constantRoutes = [
 // 动态路由，基于用户权限动态去加载
 export const dynamicRoutes = [
   {
-    path: '/workbench',
-    component: Layout,
-    redirect: '/workbench/index',
-    name: 'Workbench',
-    meta: { title: '工作台', icon: 'workbench' },
-    children: [
-      {
-        path: 'index',
-        component: () => import('@/views/workbench/index'),
-        name: 'WorkbenchIndex',
-        meta: { title: '工作台', icon: 'workbench', affix: true }
-      }
-    ]
-  },
-  {
     path: '/system/user-auth',
     component: Layout,
     hidden: true,

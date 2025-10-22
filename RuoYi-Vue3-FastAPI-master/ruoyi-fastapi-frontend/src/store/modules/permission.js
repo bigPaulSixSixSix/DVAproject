@@ -44,6 +44,7 @@ const usePermissionStore = defineStore(
             const defaultRoutes = filterAsyncRouter(defaultData)
             const asyncRoutes = filterDynamicRoutes(dynamicRoutes)
             asyncRoutes.forEach(route => { router.addRoute(route) })
+            
             this.setRoutes(rewriteRoutes)
             this.setSidebarRouters(constantRoutes.concat(sidebarRoutes))
             this.setDefaultRoutes(sidebarRoutes)
@@ -108,6 +109,9 @@ export function filterDynamicRoutes(routes) {
       if (auth.hasRoleOr(route.roles)) {
         res.push(route)
       }
+    } else {
+      // 没有权限限制的路由直接添加（如工作台）
+      res.push(route)
     }
   })
   return res

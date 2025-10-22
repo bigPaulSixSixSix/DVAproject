@@ -1,23 +1,28 @@
 <template>
-  <el-card class="function-card" shadow="hover" @click="handleClick" :body-style="{ padding: '0' }">
-    <div class="function-content">
-      <div class="function-icon">
-        <svg-icon :icon-class="iconName" :style="{ color: iconColor, fontSize: '24px' }" />
+  <div @click="handleClick" class="function-link">
+    <el-card class="function-card" shadow="hover" :body-style="{ padding: '0' }">
+      <div class="function-content">
+        <div class="function-icon">
+          <svg-icon :icon-class="iconName" :style="{ color: iconColor, fontSize: '24px' }" />
+        </div>
+        <div class="function-title">{{ title }}</div>
+        <div class="function-arrow">
+          <el-icon :size="16" color="#999">
+            <ArrowRight />
+          </el-icon>
+        </div>
       </div>
-      <div class="function-title">{{ title }}</div>
-      <div class="function-arrow">
-        <el-icon :size="16" color="#999">
-          <ArrowRight />
-        </el-icon>
-      </div>
-    </div>
-  </el-card>
+    </el-card>
+  </div>
 </template>
 
 <script setup>
 import { ArrowRight } from '@element-plus/icons-vue'
-import { useRouter } from 'vue-router'
 import SvgIcon from '@/components/SvgIcon'
+import { getNormalPath } from '@/utils/ruoyi'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
 
 const props = defineProps({
   title: {
@@ -38,14 +43,29 @@ const props = defineProps({
   }
 })
 
-const router = useRouter()
+// 规范化路径，使用完整路径
+const normalizedPath = computed(() => {
+  return getNormalPath(props.path)
+})
 
+// 处理点击事件
 const handleClick = () => {
-  router.push(props.path)
+  router.push(normalizedPath.value)
 }
 </script>
 
 <style scoped lang="scss">
+.function-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  
+  &:hover {
+    text-decoration: none;
+    color: inherit;
+  }
+}
+
 .function-card {
   cursor: pointer;
   transition: all 0.3s ease;
