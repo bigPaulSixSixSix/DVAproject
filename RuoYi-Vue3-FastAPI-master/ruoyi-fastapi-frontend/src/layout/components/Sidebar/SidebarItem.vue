@@ -1,6 +1,16 @@
 <template>
   <div v-if="!item.hidden">
-    <template v-if="hasOneShowingChild(item.children, item) && (!onlyOneChild.children || onlyOneChild.noShowingChildren) && !item.alwaysShow">
+    <!-- 特殊处理：工作台路由始终显示为单个菜单项，不展开 -->
+    <template v-if="isWorkbenchRoute(item)">
+      <app-link v-if="item.meta" :to="resolvePath(item.path, item.query)">
+        <el-menu-item :index="resolvePath(item.path)" :class="{ 'submenu-title-noDropdown': !isNest }">
+          <svg-icon :icon-class="item.meta.icon"/>
+          <template #title><span class="menu-title" :title="hasTitle(item.meta.title)">{{ item.meta.title }}</span></template>
+        </el-menu-item>
+      </app-link>
+    </template>
+    
+    <template v-else-if="hasOneShowingChild(item.children, item) && (!onlyOneChild.children || onlyOneChild.noShowingChildren) && !item.alwaysShow">
       <app-link v-if="onlyOneChild.meta" :to="resolvePath(onlyOneChild.path, onlyOneChild.query)">
         <el-menu-item :index="resolvePath(onlyOneChild.path)" :class="{ 'submenu-title-noDropdown': !isNest }">
           <svg-icon :icon-class="onlyOneChild.meta.icon || (item.meta && item.meta.icon)"/>
@@ -50,7 +60,21 @@ const props = defineProps({
 
 const onlyOneChild = ref({});
 
+// 判断是否是工作台路由
+function isWorkbenchRoute(item) {
+  return item.path === 'workbench' || 
+         item.path === '/workbench' || 
+         (item.meta && item.meta.title === '工作台')
+}
+
 function hasOneShowingChild(children = [], parent) {
+  // 特殊处理：如果是工作台路由，即使有 children 也不显示为可展开菜单
+  if (isWorkbenchRoute(parent)) {
+    // 工作台路由应该显示为单个菜单项，不展开
+    onlyOneChild.value = { ...parent, path: '', noShowingChildren: true }
+    return true
+  }
+  
   if (!children) {
     children = [];
   }
@@ -83,6 +107,17 @@ function resolvePath(routePath, routeQuery) {
   if (isExternal(props.basePath)) {
     return props.basePath
   }
+  
+  // 特殊处理：工作台路由的路径处理
+  // 如果 basePath 是 "/" 且 routePath 是 "workbench"，直接返回 "/workbench"
+  if (props.basePath === '/' && routePath === 'workbench') {
+    if (routeQuery) {
+      let query = JSON.parse(routeQuery);
+      return { path: '/workbench', query: query }
+    }
+    return '/workbench'
+  }
+  
   if (routeQuery) {
     let query = JSON.parse(routeQuery);
     return { path: getNormalPath(props.basePath + '/' + routePath), query: query }

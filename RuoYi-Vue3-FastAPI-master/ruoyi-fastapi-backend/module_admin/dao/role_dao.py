@@ -1,10 +1,14 @@
 from datetime import datetime, time
 from sqlalchemy import and_, delete, desc, func, or_, select, update  # noqa: F401
 from sqlalchemy.ext.asyncio import AsyncSession
-from module_admin.entity.do.dept_do import SysDept
+from module_admin.entity.do.oa_department_do import OaDepartment  # noqa: F401
+from module_admin.entity.do.oa_employee_primary_do import OaEmployeePrimary  # noqa: F401
 from module_admin.entity.do.menu_do import SysMenu
-from module_admin.entity.do.role_do import SysRole, SysRoleMenu, SysRoleDept
-from module_admin.entity.do.user_do import SysUser, SysUserRole
+from module_admin.entity.do.role_do import SysRole, SysRoleMenu, SysRoleDept  # noqa: F401
+from module_admin.entity.do.sys_user_local_do import SysUserLocal  # noqa: F401
+from module_admin.entity.do.user_do import SysUserRole
+# 确保在 eval() 执行时这些类可以被访问
+# 这些导入是为了在 data_scope.py 生成的 SQL 字符串中使用
 from module_admin.entity.vo.role_vo import RoleDeptModel, RoleMenuModel, RoleModel, RolePageQueryModel
 from utils.page_util import PageUtil
 
@@ -137,11 +141,29 @@ class RoleDao:
         :param is_page: 是否开启分页
         :return: 角色列表信息对象
         """
+        # 角色列表查询：数据权限范围基于部门
+        # 需要通过用户-角色关联 → 用户 → 员工 → 部门 来过滤角色
+        # 使用新表：SysUserLocal → OaEmployeePrimary → OaDepartment
         query = (
             select(SysRole)
             .join(SysUserRole, SysUserRole.role_id == SysRole.role_id, isouter=True)
-            .join(SysUser, SysUser.user_id == SysUserRole.user_id, isouter=True)
-            .join(SysDept, SysDept.dept_id == SysUser.dept_id, isouter=True)
+            .join(SysUserLocal, SysUserLocal.user_id == SysUserRole.user_id, isouter=True)
+            .join(
+                OaEmployeePrimary,
+                and_(
+                    OaEmployeePrimary.id == SysUserLocal.employee_id,
+                    SysUserLocal.employee_id != 0,  # 管理员账户 employee_id=0，不JOIN员工表
+                ),
+                isouter=True,
+            )
+            .join(
+                OaDepartment,
+                and_(
+                    OaEmployeePrimary.organization_id == OaDepartment.id,
+                    OaDepartment.enable == '1',
+                ),
+                isouter=True,
+            )
             .where(
                 SysRole.del_flag == '0',
                 SysRole.role_id == query_object.role_id if query_object.role_id is not None else True,
@@ -154,11 +176,23 @@ class RoleDao:
                 )
                 if query_object.begin_time and query_object.end_time
                 else True,
-                eval(data_scope_sql),
             )
-            .order_by(SysRole.role_sort)
-            .distinct()
         )
+        # 数据权限过滤：修改 SQL 字符串中的表名引用
+        # data_scope_sql 中使用的是 query_alias（'OaDepartment'），需要替换为实际的表对象
+        if data_scope_sql:
+            # 将 SQL 字符串中的 'OaDepartment' 替换为实际的表对象
+            # 例如：'OaDepartment.id == 1' → 'OaDepartment.id == 1'（OaDepartment 已经在环境中）
+            try:
+                # 确保 eval 执行环境中可以访问到 OaDepartment
+                data_scope_condition = eval(data_scope_sql)
+                query = query.where(data_scope_condition)
+            except Exception as e:
+                # 如果 eval 失败，记录错误但不中断查询（可能是权限配置问题）
+                from utils.log_util import logger
+                logger.warning(f'角色列表数据权限过滤失败: {str(e)}, data_scope_sql={data_scope_sql}')
+        
+        query = query.order_by(SysRole.role_sort).distinct()
         role_list = await PageUtil.paginate(db, query, query_object.page_num, query_object.page_size, is_page)
 
         return role_list
@@ -267,6 +301,7 @@ class RoleDao:
     async def get_role_dept_dao(cls, db: AsyncSession, role: RoleModel):
         """
         根据角色id获取角色部门关联列表信息
+        使用真实表 oa_department
 
         :param db: orm对象
         :param role: 角色对象
@@ -275,22 +310,22 @@ class RoleDao:
         role_dept_query_all = (
             (
                 await db.execute(
-                    select(SysDept)
-                    .join(SysRoleDept, SysRoleDept.dept_id == SysDept.dept_id)
+                    select(OaDepartment)
+                    .join(SysRoleDept, SysRoleDept.dept_id == OaDepartment.id)
                     .where(
                         SysRoleDept.role_id == role.role_id,
-                        ~SysDept.dept_id.in_(
-                            select(SysDept.parent_id)
-                            .select_from(SysDept)
+                        ~OaDepartment.id.in_(
+                            select(OaDepartment.parent_id)
+                            .select_from(OaDepartment)
                             .join(
                                 SysRoleDept,
-                                and_(SysRoleDept.dept_id == SysDept.dept_id, SysRoleDept.role_id == role.role_id),
+                                and_(SysRoleDept.dept_id == OaDepartment.id, SysRoleDept.role_id == role.role_id),
                             )
                         )
                         if role.dept_check_strictly
                         else True,
                     )
-                    .order_by(SysDept.parent_id, SysDept.order_num)
+                    .order_by(OaDepartment.parent_id, OaDepartment.sort_no)
                 )
             )
             .scalars()

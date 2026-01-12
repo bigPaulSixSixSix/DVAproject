@@ -97,6 +97,7 @@ class LoginService:
         if not user:
             logger.warning('用户不存在')
             raise LoginException(data='', message='用户不存在')
+        # user[0] = SysUserLocal, user[1] = OaEmployeePrimary, user[2] = OaDepartment
         if not PwdUtil.verify_password(login_user.password, user[0].password):
             cache_password_error_count = await request.app.state.redis.get(
                 f'{RedisInitKeyConfig.PASSWORD_ERROR_COUNT.key}:{login_user.user_name}'
@@ -123,6 +124,7 @@ class LoginService:
                 raise LoginException(data='', message='10分钟内密码已输错超过5次，账号已锁定，请10分钟后再试')
             logger.warning('密码错误')
             raise LoginException(data='', message='密码错误')
+        # 检查用户状态（使用本地用户表的status字段）
         if user[0].status == '1':
             logger.warning('用户已停用')
             raise LoginException(data='', message='用户已停用')
@@ -234,14 +236,17 @@ class LoginService:
                     ex=timedelta(minutes=JwtConfig.jwt_redis_expire_minutes),
                 )
 
-            role_id_list = [item.role_id for item in query_user.get('user_role_info')]
+            role_id_list = [item.role_id for item in query_user.get('user_role_info', [])]
             if 1 in role_id_list:
                 permissions = ['*:*:*']
             else:
-                permissions = [row.perms for row in query_user.get('user_menu_info')]
-            post_ids = ','.join([str(row.post_id) for row in query_user.get('user_post_info')])
-            role_ids = ','.join([str(row.role_id) for row in query_user.get('user_role_info')])
-            roles = [row.role_key for row in query_user.get('user_role_info')]
+                # 安全处理：如果 user_menu_info 为空或 None，返回空列表
+                user_menu_info = query_user.get('user_menu_info', []) or []
+                permissions = [row.perms for row in user_menu_info if row.perms]  # 过滤掉 None 或空字符串
+            # 岗位信息：从 oa_department.rank_id → oa_rank 获取（只读显示）
+            post_ids = ','.join([str(row.post_id) for row in query_user.get('user_post_info', [])]) if query_user.get('user_post_info') else ''
+            role_ids = ','.join([str(row.role_id) for row in query_user.get('user_role_info', [])]) if query_user.get('user_role_info') else ''
+            roles = [row.role_key for row in query_user.get('user_role_info', [])]
             is_default_modify_pwd = await cls.__init_password_is_modify(
                 request, query_user.get('user_basic_info').pwd_update_date
             )
@@ -311,10 +316,12 @@ class LoginService:
         :return: 当前用户路由信息对象
         """
         query_user = await UserDao.get_user_by_id(query_db, user_id=user_id)
+        # 安全处理：如果 user_menu_info 为空或 None，返回空列表
+        user_menu_info = query_user.get('user_menu_info', []) or []
         user_router_menu = sorted(
             [
                 row
-                for row in query_user.get('user_menu_info')
+                for row in user_menu_info
                 if row.menu_type in [MenuConstant.TYPE_DIR, MenuConstant.TYPE_MENU]
             ],
             key=lambda x: x.order_num,
@@ -327,14 +334,17 @@ class LoginService:
     def __generate_menus(cls, pid: int, permission_list: List[SysMenu]):
         """
         工具方法：根据菜单信息生成菜单信息树形嵌套数据
+        注意：只会在 permission_list 中查找子菜单，不会包含未分配的菜单
 
         :param pid: 菜单id
-        :param permission_list: 菜单列表信息
+        :param permission_list: 菜单列表信息（只包含用户有权限的菜单）
         :return: 菜单信息树形嵌套数据
         """
         menu_list: List[MenuTreeModel] = []
+        # 只遍历 permission_list 中的菜单，确保只包含用户有权限的菜单
         for permission in permission_list:
             if permission.parent_id == pid:
+                # 递归查找子菜单，但只在 permission_list 中查找
                 children = cls.__generate_menus(permission.menu_id, permission_list)
                 menu_list_data = MenuTreeModel(**CamelCaseUtil.transform_result(permission))
                 if children:
@@ -342,6 +352,16 @@ class LoginService:
                 menu_list.append(menu_list_data)
 
         return menu_list
+
+    @classmethod
+    def __is_workbench(cls, permission: MenuTreeModel) -> bool:
+        """
+        判断是否为工作台菜单
+
+        :param permission: 菜单树对象
+        :return: 是否为工作台
+        """
+        return permission.menu_name == '工作台' or (permission.path and 'workbench' in permission.path.lower())
 
     @classmethod
     def __generate_user_router_menu(cls, permission_list: List[MenuTreeModel]):
@@ -372,22 +392,46 @@ class LoginService:
                 router.redirect = 'noRedirect'
                 router.children = cls.__generate_user_router_menu(c_menus)
             elif RouterUtil.is_menu_frame(permission):
-                router.meta = None
-                children_list: List[RouterModel] = []
-                children = RouterModel(
-                    path=permission.path,
-                    component=permission.component,
-                    name=RouterUtil.get_route_name(permission.route_name, permission.path),
-                    meta=MetaModel(
-                        title=permission.menu_name,
-                        icon=permission.icon,
-                        noCache=True if permission.is_cache == 1 else False,
-                        link=permission.path if RouterUtil.is_http(permission.path) else None,
-                    ),
-                    query=permission.query,
-                )
-                children_list.append(children)
-                router.children = children_list
+                # 工作台特殊处理：如果有子菜单，需要递归处理子菜单
+                if c_menus and cls.__is_workbench(permission):
+                    # 工作台：path="/", component="Layout", meta=null
+                    router.meta = None
+                    children_list: List[RouterModel] = []
+                    # 第一个子项：工作台本身
+                    workbench_self = RouterModel(
+                        path=permission.path,
+                        component=permission.component,
+                        name=RouterUtil.get_route_name(permission.route_name, permission.path),
+                        meta=MetaModel(
+                            title=permission.menu_name,
+                            icon=permission.icon,
+                            noCache=True if permission.is_cache == 1 else False,
+                            link=permission.path if RouterUtil.is_http(permission.path) else None,
+                        ),
+                        query=permission.query,
+                    )
+                    children_list.append(workbench_self)
+                    # 递归处理工作台的子菜单（完整深度遍历）
+                    children_list.extend(cls.__generate_user_router_menu(c_menus))
+                    router.children = children_list
+                else:
+                    # 其他 is_menu_frame 类型：按原逻辑处理
+                    router.meta = None
+                    children_list: List[RouterModel] = []
+                    children = RouterModel(
+                        path=permission.path,
+                        component=permission.component,
+                        name=RouterUtil.get_route_name(permission.route_name, permission.path),
+                        meta=MetaModel(
+                            title=permission.menu_name,
+                            icon=permission.icon,
+                            noCache=True if permission.is_cache == 1 else False,
+                            link=permission.path if RouterUtil.is_http(permission.path) else None,
+                        ),
+                        query=permission.query,
+                    )
+                    children_list.append(children)
+                    router.children = children_list
             elif permission.parent_id == 0 and RouterUtil.is_inner_link(permission):
                 router.meta = MetaModel(title=permission.menu_name, icon=permission.icon)
                 router.path = '/'

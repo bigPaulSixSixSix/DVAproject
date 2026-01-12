@@ -40,13 +40,23 @@ async def login(
         captchaEnabled=captcha_enabled,
     )
     result = await LoginService.authenticate_user(request, query_db, user)
+    # result[0] = SysUserLocal, result[1] = OaEmployeePrimary, result[2] = OaDepartment
     access_token_expires = timedelta(minutes=JwtConfig.jwt_expire_minutes)
     session_id = str(uuid.uuid4())
+    
+    # 获取部门名称（管理员账户可能没有部门）
+    dept_name = None
+    if result[2]:  # OaDepartment
+        dept_name = result[2].name
+    elif result[1] and result[1].organization_id:  # 如果有员工信息，尝试获取部门名称
+        # 这里可以进一步查询，但为了简化，暂时设为None
+        dept_name = None
+    
     access_token = await LoginService.create_access_token(
         data={
             'user_id': str(result[0].user_id),
-            'user_name': result[0].user_name,
-            'dept_name': result[1].dept_name if result[1] else None,
+            'user_name': result[0].job_number,  # 使用 job_number 作为 user_name
+            'dept_name': dept_name,
             'session_id': session_id,
             'login_info': user.login_info,
         },
@@ -65,9 +75,19 @@ async def login(
             access_token,
             ex=timedelta(minutes=JwtConfig.jwt_redis_expire_minutes),
         )
-    await UserService.edit_user_services(
-        query_db, EditUserModel(userId=result[0].user_id, loginDate=datetime.now(), type='status')
+    
+    # 更新登录信息（更新本地用户表的登录时间和IP）
+    from module_admin.entity.do.sys_user_local_do import SysUserLocal
+    from sqlalchemy import update
+    await query_db.execute(
+        update(SysUserLocal)
+        .where(SysUserLocal.user_id == result[0].user_id)
+        .values(
+            login_ip=request.client.host if request.client else '',
+            login_date=datetime.now(),
+        )
     )
+    await query_db.commit()
     logger.info('登录成功')
     # 判断请求是否来自于api文档，如果是返回指定格式的结果，用于修复api文档认证成功后token显示undefined的bug
     request_from_swagger = request.headers.get('referer').endswith('docs') if request.headers.get('referer') else False

@@ -95,7 +95,7 @@ function logout() {
     type: 'warning'
   }).then(() => {
     userStore.logOut().then(() => {
-      location.href = '/index'
+      location.href = '/workbench'
     })
   }).catch(() => { })
 }
@@ -116,7 +116,7 @@ function toggleTheme() {
   overflow: hidden;
   position: relative;
   background: var(--navbar-bg);
-  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  border-bottom: 1px solid var(--el-border-color-lighter);
 
   .hamburger-container {
     line-height: 46px;

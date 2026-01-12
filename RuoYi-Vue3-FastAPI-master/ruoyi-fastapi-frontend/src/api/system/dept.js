@@ -1,6 +1,7 @@
 import request from '@/utils/request'
 
 // 查询部门列表
+// 注意：此API应该应用数据权限过滤，如果后端没有实现，需要后端修复
 export function listDept(query) {
   return request({
     url: '/system/dept/list',
@@ -9,44 +10,11 @@ export function listDept(query) {
   })
 }
 
-// 查询部门列表（排除节点）
-export function listDeptExcludeChild(deptId) {
+// 查询部门树（带数据权限过滤）
+// 使用与用户管理页面相同的API，确保数据权限正确应用
+export function deptTreeSelect() {
   return request({
-    url: '/system/dept/list/exclude/' + deptId,
+    url: '/system/user/deptTree',
     method: 'get'
-  })
-}
-
-// 查询部门详细
-export function getDept(deptId) {
-  return request({
-    url: '/system/dept/' + deptId,
-    method: 'get'
-  })
-}
-
-// 新增部门
-export function addDept(data) {
-  return request({
-    url: '/system/dept',
-    method: 'post',
-    data: data
-  })
-}
-
-// 修改部门
-export function updateDept(data) {
-  return request({
-    url: '/system/dept',
-    method: 'put',
-    data: data
-  })
-}
-
-// 删除部门
-export function delDept(deptId) {
-  return request({
-    url: '/system/dept/' + deptId,
-    method: 'delete'
   })
 }

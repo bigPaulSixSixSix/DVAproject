@@ -311,6 +311,7 @@ class RoleService:
     ):
         """
         根据角色id获取已分配用户列表
+        使用真实表 oa_employee_primary + sys_user_local
 
         :param query_db: orm对象
         :param page_object: 用户关联角色对象
@@ -318,13 +319,51 @@ class RoleService:
         :param is_page: 是否开启分页
         :return: 已分配用户列表
         """
+        from utils.common_util import CamelCaseUtil, SnakeCaseUtil
+        from utils.field_mapper import FieldMapper
+        
         query_user_list = await UserDao.get_user_role_allocated_list_by_role_id(
             query_db, page_object, data_scope_sql, is_page
         )
+        
+        # 转换数据格式：将真实表数据转换为系统框架格式
+        # 参考 get_user_list_services 的转换逻辑
+        converted_rows = []
+        for row in query_user_list.rows:
+            # row 是列表格式：[employee_dict, user_local_dict, dept_dict]，每个都是字典（camelCase）
+            if isinstance(row, list):
+                employee_dict = row[0] if len(row) > 0 else None
+                user_local_dict = row[1] if len(row) > 1 else None
+                dept_dict = row[2] if len(row) > 2 else None
+            else:
+                # Row 对象，通过索引访问
+                employee_dict = row[0] if hasattr(row, '__getitem__') and len(row) > 0 else None
+                user_local_dict = row[1] if hasattr(row, '__getitem__') and len(row) > 1 else None
+                dept_dict = row[2] if hasattr(row, '__getitem__') and len(row) > 2 else None
+            
+            # 转换为下划线格式以便处理
+            employee_snake = SnakeCaseUtil.transform_result(employee_dict) if isinstance(employee_dict, dict) and employee_dict else None
+            user_local_snake = SnakeCaseUtil.transform_result(user_local_dict) if isinstance(user_local_dict, dict) and user_local_dict else {}
+            dept_snake = SnakeCaseUtil.transform_result(dept_dict) if isinstance(dept_dict, dict) and dept_dict else None
+            
+            if employee_snake:
+                # 使用字段映射工具转换为系统框架格式
+                mapped_user_dict = FieldMapper.map_employee_to_user_format(employee_snake, user_local_snake)
+                mapped_dept_dict = FieldMapper.map_dept_to_sys_format(dept_snake) if dept_snake else {}
+                
+                # 转换为 camelCase 格式
+                user_camel = CamelCaseUtil.transform_result(mapped_user_dict)
+                dept_camel = CamelCaseUtil.transform_result(mapped_dept_dict) if mapped_dept_dict else None
+                
+                converted_rows.append({
+                    **user_camel,
+                    'dept': dept_camel
+                })
+        
         allocated_list = PageResponseModel(
             **{
                 **query_user_list.model_dump(by_alias=True),
-                'rows': [UserInfoModel(**row) for row in query_user_list.rows],
+                'rows': converted_rows,
             }
         )
 
@@ -336,6 +375,7 @@ class RoleService:
     ):
         """
         根据角色id获取未分配用户列表
+        使用真实表 oa_employee_primary + sys_user_local
 
         :param query_db: orm对象
         :param page_object: 用户关联角色对象
@@ -343,13 +383,51 @@ class RoleService:
         :param is_page: 是否开启分页
         :return: 未分配用户列表
         """
+        from utils.common_util import CamelCaseUtil, SnakeCaseUtil
+        from utils.field_mapper import FieldMapper
+        
         query_user_list = await UserDao.get_user_role_unallocated_list_by_role_id(
             query_db, page_object, data_scope_sql, is_page
         )
+        
+        # 转换数据格式：将真实表数据转换为系统框架格式
+        # 参考 get_user_list_services 的转换逻辑
+        converted_rows = []
+        for row in query_user_list.rows:
+            # row 是列表格式：[employee_dict, user_local_dict, dept_dict]，每个都是字典（camelCase）
+            if isinstance(row, list):
+                employee_dict = row[0] if len(row) > 0 else None
+                user_local_dict = row[1] if len(row) > 1 else None
+                dept_dict = row[2] if len(row) > 2 else None
+            else:
+                # Row 对象，通过索引访问
+                employee_dict = row[0] if hasattr(row, '__getitem__') and len(row) > 0 else None
+                user_local_dict = row[1] if hasattr(row, '__getitem__') and len(row) > 1 else None
+                dept_dict = row[2] if hasattr(row, '__getitem__') and len(row) > 2 else None
+            
+            # 转换为下划线格式以便处理
+            employee_snake = SnakeCaseUtil.transform_result(employee_dict) if isinstance(employee_dict, dict) and employee_dict else None
+            user_local_snake = SnakeCaseUtil.transform_result(user_local_dict) if isinstance(user_local_dict, dict) and user_local_dict else {}
+            dept_snake = SnakeCaseUtil.transform_result(dept_dict) if isinstance(dept_dict, dict) and dept_dict else None
+            
+            if employee_snake:
+                # 使用字段映射工具转换为系统框架格式
+                mapped_user_dict = FieldMapper.map_employee_to_user_format(employee_snake, user_local_snake)
+                mapped_dept_dict = FieldMapper.map_dept_to_sys_format(dept_snake) if dept_snake else {}
+                
+                # 转换为 camelCase 格式
+                user_camel = CamelCaseUtil.transform_result(mapped_user_dict)
+                dept_camel = CamelCaseUtil.transform_result(mapped_dept_dict) if mapped_dept_dict else None
+                
+                converted_rows.append({
+                    **user_camel,
+                    'dept': dept_camel
+                })
+        
         unallocated_list = PageResponseModel(
             **{
                 **query_user_list.model_dump(by_alias=True),
-                'rows': [UserInfoModel(**row) for row in query_user_list.rows],
+                'rows': converted_rows,
             }
         )
 

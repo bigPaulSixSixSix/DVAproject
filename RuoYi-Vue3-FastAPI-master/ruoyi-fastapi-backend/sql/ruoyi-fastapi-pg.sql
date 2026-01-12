@@ -274,7 +274,6 @@ insert into sys_menu values(1001, '用户新增', 100, '2',  '', '', '', '', 1, 
 insert into sys_menu values(1002, '用户修改', 100, '3',  '', '', '', '', 1, 0, 'F', '0', '0', 'system:user:edit',           '#', 'admin', current_timestamp, '', null, '');
 insert into sys_menu values(1003, '用户删除', 100, '4',  '', '', '', '', 1, 0, 'F', '0', '0', 'system:user:remove',         '#', 'admin', current_timestamp, '', null, '');
 insert into sys_menu values(1004, '用户导出', 100, '5',  '', '', '', '', 1, 0, 'F', '0', '0', 'system:user:export',         '#', 'admin', current_timestamp, '', null, '');
-insert into sys_menu values(1005, '用户导入', 100, '6',  '', '', '', '', 1, 0, 'F', '0', '0', 'system:user:import',         '#', 'admin', current_timestamp, '', null, '');
 insert into sys_menu values(1006, '重置密码', 100, '7',  '', '', '', '', 1, 0, 'F', '0', '0', 'system:user:resetPwd',       '#', 'admin', current_timestamp, '', null, '');
 -- 角色管理按钮
 insert into sys_menu values(1007, '角色查询', 101, '1',  '', '', '', '', 1, 0, 'F', '0', '0', 'system:role:query',          '#', 'admin', current_timestamp, '', null, '');
@@ -289,9 +288,6 @@ insert into sys_menu values(1014, '菜单修改', 102, '3',  '', '', '', '', 1, 
 insert into sys_menu values(1015, '菜单删除', 102, '4',  '', '', '', '', 1, 0, 'F', '0', '0', 'system:menu:remove',         '#', 'admin', current_timestamp, '', null, '');
 -- 部门管理按钮
 insert into sys_menu values(1016, '部门查询', 103, '1',  '', '', '', '', 1, 0, 'F', '0', '0', 'system:dept:query',          '#', 'admin', current_timestamp, '', null, '');
-insert into sys_menu values(1017, '部门新增', 103, '2',  '', '', '', '', 1, 0, 'F', '0', '0', 'system:dept:add',            '#', 'admin', current_timestamp, '', null, '');
-insert into sys_menu values(1018, '部门修改', 103, '3',  '', '', '', '', 1, 0, 'F', '0', '0', 'system:dept:edit',           '#', 'admin', current_timestamp, '', null, '');
-insert into sys_menu values(1019, '部门删除', 103, '4',  '', '', '', '', 1, 0, 'F', '0', '0', 'system:dept:remove',         '#', 'admin', current_timestamp, '', null, '');
 -- 岗位管理按钮
 insert into sys_menu values(1020, '岗位查询', 104, '1',  '', '', '', '', 1, 0, 'F', '0', '0', 'system:post:query',          '#', 'admin', current_timestamp, '', null, '');
 insert into sys_menu values(1021, '岗位新增', 104, '2',  '', '', '', '', 1, 0, 'F', '0', '0', 'system:post:add',            '#', 'admin', current_timestamp, '', null, '');
@@ -407,7 +403,6 @@ insert into sys_role_menu values (2, 1001);
 insert into sys_role_menu values (2, 1002);
 insert into sys_role_menu values (2, 1003);
 insert into sys_role_menu values (2, 1004);
-insert into sys_role_menu values (2, 1005);
 insert into sys_role_menu values (2, 1006);
 insert into sys_role_menu values (2, 1007);
 insert into sys_role_menu values (2, 1008);
@@ -419,9 +414,6 @@ insert into sys_role_menu values (2, 1013);
 insert into sys_role_menu values (2, 1014);
 insert into sys_role_menu values (2, 1015);
 insert into sys_role_menu values (2, 1016);
-insert into sys_role_menu values (2, 1017);
-insert into sys_role_menu values (2, 1018);
-insert into sys_role_menu values (2, 1019);
 insert into sys_role_menu values (2, 1020);
 insert into sys_role_menu values (2, 1021);
 insert into sys_role_menu values (2, 1022);

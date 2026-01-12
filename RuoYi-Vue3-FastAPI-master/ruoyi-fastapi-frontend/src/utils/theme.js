@@ -1,11 +1,28 @@
 // 处理主题样式
 export function handleThemeStyle(theme) {
+	const isDark = document.documentElement.classList.contains('dark')
 	document.documentElement.style.setProperty('--el-color-primary', theme)
-	for (let i = 1; i <= 9; i++) {
-		document.documentElement.style.setProperty(`--el-color-primary-light-${i}`, `${getLightColor(theme, i / 10)}`)
-	}
-	for (let i = 1; i <= 9; i++) {
-		document.documentElement.style.setProperty(`--el-color-primary-dark-${i}`, `${getDarkColor(theme, i / 10)}`)
+	
+	// 在深色模式下，移除内联样式，让 Element Plus 自己处理颜色变量
+	// 这样 Element Plus 的深色模式颜色变量可以正常工作
+	if (isDark) {
+		// 移除内联样式，让 Element Plus 的深色模式变量生效
+		for (let i = 1; i <= 9; i++) {
+			document.documentElement.style.removeProperty(`--el-color-primary-light-${i}`)
+		}
+		// 仍然设置 dark 变量，以备需要
+		for (let i = 1; i <= 9; i++) {
+			document.documentElement.style.setProperty(`--el-color-primary-dark-${i}`, `${getDarkColor(theme, i / 10)}`)
+		}
+	} else {
+		// 浅色模式下，设置 light 变量
+		for (let i = 1; i <= 9; i++) {
+			document.documentElement.style.setProperty(`--el-color-primary-light-${i}`, `${getLightColor(theme, i / 10)}`)
+		}
+		// 仍然设置 dark 变量，以备需要
+		for (let i = 1; i <= 9; i++) {
+			document.documentElement.style.setProperty(`--el-color-primary-dark-${i}`, `${getDarkColor(theme, i / 10)}`)
+		}
 	}
 }
 

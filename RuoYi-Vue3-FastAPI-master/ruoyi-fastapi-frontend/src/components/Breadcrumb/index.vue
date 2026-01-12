@@ -32,9 +32,9 @@ function getBreadcrumb() {
   } else {
     matched = route.matched.filter((item) => item.meta && item.meta.title)
   }
-  // 判断是否为首页
-  if (!isDashboard(matched[0])) {
-    matched = [{ path: "/index", meta: { title: "首页" } }].concat(matched)
+  // 判断是否为工作台
+  if (!isWorkbench(matched[0])) {
+    matched = [{ path: "/workbench", meta: { title: "工作台" } }].concat(matched)
   }
   levelList.value = matched.filter(item => item.meta && item.meta.title && item.meta.breadcrumb !== false)
 }
@@ -57,12 +57,12 @@ function getMatched(pathList, routeList, matched) {
     }
   }
 }
-function isDashboard(route) {
-  const name = route && route.name
-  if (!name) {
+function isWorkbench(route) {
+  const path = route && route.path
+  if (!path) {
     return false
   }
-  return name.trim() === 'Index'
+  return path === '/workbench' || path === 'workbench'
 }
 function handleLink(item) {
   const { redirect, path } = item

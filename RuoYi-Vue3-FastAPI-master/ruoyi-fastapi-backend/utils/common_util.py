@@ -65,6 +65,10 @@ class SqlalchemyUtil:
                     base_dict[name] = cls.serialize_result(value, 'snake_to_camel')
         elif isinstance(obj, dict):
             base_dict = obj.copy()
+        else:
+            # 处理普通对象（有 __dict__ 属性的对象）
+            base_dict = obj.__dict__.copy() if hasattr(obj, '__dict__') else {}
+        
         if transform_case == 'snake_to_camel':
             return {CamelCaseUtil.snake_to_camel(k): v for k, v in base_dict.items()}
         elif transform_case == 'camel_to_snake':
@@ -83,7 +87,8 @@ class SqlalchemyUtil:
         :param transform_case: 转换得到的结果形式，可选的有'no_case'(不转换)、'snake_to_camel'(下划线转小驼峰)、'camel_to_snake'(小驼峰转下划线)，默认为'no_case'
         :return: 序列化结果
         """
-        if isinstance(result, (Base, dict)):
+        # 处理 Base 对象、字典或普通对象（有 __dict__ 属性的对象）
+        if isinstance(result, (Base, dict)) or (hasattr(result, '__dict__') and not isinstance(result, (list, Row))):
             return cls.base_to_dict(result, transform_case)
         elif isinstance(result, list):
             return [cls.serialize_result(row, transform_case) for row in result]

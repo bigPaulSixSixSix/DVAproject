@@ -13,6 +13,8 @@
 </template>
 
 <script setup>
+import { useRoute } from 'vue-router'
+import { onMounted, watchEffect } from 'vue'
 import copyright from "./Copyright/index"
 import iframeToggle from "./IframeToggle/index"
 import useTagsViewStore from '@/store/modules/tagsView'
@@ -54,12 +56,12 @@ function addIframe() {
 
 .hasTagsView {
   .app-main {
-    /* 84 = navbar + tags-view = 50 + 34 */
-    min-height: calc(100vh - 84px);
+    /* 94 = navbar + tags-view = 50 + 44 */
+    min-height: calc(100vh - 94px);
   }
 
   .fixed-header + .app-main {
-    padding-top: 84px;
+    padding-top: 94px;
   }
 }
 </style>

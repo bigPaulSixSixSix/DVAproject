@@ -123,9 +123,17 @@ const useTagsViewStore = defineStore(
         })
       },
       updateVisitedView(view) {
-        for (let v of this.visitedViews) {
-          if (v.path === view.path) {
-            v = Object.assign(v, view)
+        for (let i = 0; i < this.visitedViews.length; i++) {
+          if (this.visitedViews[i].path === view.path) {
+            // 更新title属性（从meta.title获取）
+            const newTitle = view.meta?.title || view.title || this.visitedViews[i].title
+            this.visitedViews[i] = Object.assign({}, this.visitedViews[i], view, {
+              title: newTitle,
+              meta: {
+                ...this.visitedViews[i].meta,
+                ...view.meta
+              }
+            })
             break
           }
         }

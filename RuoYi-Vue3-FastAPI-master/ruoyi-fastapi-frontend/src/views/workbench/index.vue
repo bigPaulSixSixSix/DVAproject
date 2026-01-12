@@ -43,15 +43,11 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { listMenu } from '@/api/system/menu'
-import { getRouters } from '@/api/menu'
 import AnnouncementCard from '@/components/Workbench/SummaryCard/AnnouncementCard.vue'
 import TaskCard from '@/components/Workbench/SummaryCard/TaskCard.vue'
 import TaskOverviewCard from '@/components/Workbench/SummaryCard/TaskOverviewCard.vue'
 import FunctionCard from '@/components/Workbench/FunctionCard/index.vue'
-import usePermissionStore, { loadView } from '@/store/modules/permission'
-import router from '@/router'
-import Layout from '@/layout'
+import usePermissionStore from '@/store/modules/permission'
 
 defineOptions({
   name: 'Workbench'
@@ -59,179 +55,200 @@ defineOptions({
 
 const workbenchCategories = ref([])
 
-// 从已注册的路由中查找匹配的路径
-const findRegisteredPath = (menu, allMenus, registeredRoutes) => {
-  // 查找工作台父级菜单
-  const workbenchParent = allMenus.find(m => m.path === 'workbench' || m.path === '/workbench')
-  if (!workbenchParent) return menu.path
-  
-  // 构建相对路径：routine/task-configuration（相对于/workbench）
-  const pathSegments = []
-  let currentMenu = menu
-  
-  // 向上遍历父级菜单，构建路径（不包括工作台本身）
-  while (currentMenu) {
-    if (currentMenu.path && currentMenu.path !== 'workbench') {
-      pathSegments.unshift(currentMenu.path)
+// 从路由数据中查找工作台路由
+const findWorkbenchRoute = (routes) => {
+  for (const route of routes) {
+    if (route.path === '/' && route.children) {
+      const workbenchChild = route.children.find(child => 
+        (child.path === 'workbench' || child.path === '/workbench') &&
+        child.component === 'workbench/index' &&
+        (child.meta && child.meta.title === '工作台')
+      )
+      if (workbenchChild) return workbenchChild
     }
-    // 查找父级菜单
-    currentMenu = allMenus.find(m => m.menuId === currentMenu.parentId)
-  }
-  
-  // 构建相对路径
-  const relativePath = pathSegments.join('/')
-  
-  // 构建完整路径：/workbench + '/' + relativePath
-  const fullPath = '/workbench/' + relativePath
-  
-  // 在已注册的路由中查找匹配的路径
-  const findRouteByPath = (routes, targetPath) => {
-    for (const route of routes) {
-      if (route.path === targetPath) {
-        return route.path
-      }
-      if (route.children) {
-        const found = findRouteByPath(route.children, targetPath)
+    if (route.children && route.children.length > 0) {
+      const found = findWorkbenchRoute(route.children)
         if (found) return found
       }
     }
     return null
   }
   
-  // 尝试多种路径格式匹配
-  const possiblePaths = [
-    fullPath,                    // /workbench/routine/taskConfiguration
-    relativePath,                // routine/taskConfiguration
-    '/' + relativePath,          // /routine/taskConfiguration
-    menu.component,              // 直接使用菜单的组件路径
-    menu.path,                   // 直接使用菜单的路径
-    // 对于跨目录组件，尝试从组件路径推断路由路径
-    menu.component ? '/' + menu.component.replace('/index.vue', '').replace('/index', '') : null
-  ]
+// 从路由数据中提取分类和功能菜单
+const extractCategoriesFromRoutes = (subMenus, basePath = '/workbench') => {
+  const categories = []
   
-  // 去重并过滤空值
-  const uniquePaths = [...new Set(possiblePaths.filter(p => p && p.trim()))]
-  
-  // 依次尝试每个可能的路径
-  for (const path of uniquePaths) {
-    const registeredPath = findRouteByPath(registeredRoutes, path)
-    if (registeredPath) {
-      return registeredPath
-    }
-  }
-  
-  // 特殊处理：对于跨目录组件，尝试更精确的匹配
-  if (menu.component && menu.component.includes('/')) {
-    const componentBasedPaths = [
-      '/' + menu.component.replace('/index.vue', '').replace('/index', ''),
-      '/' + menu.component.split('/')[0] + '/' + menu.component.split('/')[1]
-    ]
+  // 找出所有分类（ParentView 或 Layout 组件且有 children 的）
+  subMenus.forEach(menu => {
+    // 检查是否是分类组件（ParentView 或 Layout）
+    // 可能是字符串 "ParentView"/"Layout" 或组件对象
+    const isCategoryComponent = 
+      menu.component === 'ParentView' || 
+      menu.component === 'Layout' ||
+      (typeof menu.component === 'function' && (menu.component.name === 'Layout' || menu.component.name === 'ParentView')) ||
+      (menu.component && menu.component.toString().includes('Layout')) ||
+      (menu.component && menu.component.toString().includes('ParentView'))
     
-    for (const path of componentBasedPaths) {
-      const registeredPath = findRouteByPath(registeredRoutes, path)
-      if (registeredPath) {
-        return registeredPath
-      }
-    }
-  }
-  
-  // 如果都没找到，尝试动态注册路由
-  if (menu.component && menu.component.trim()) {
-    try {
-      const dynamicRoute = {
-        path: fullPath,
-        component: Layout,
-        hidden: true,
-        children: [
-          {
-            path: '',
-            component: loadView(menu.component.replace('.vue', '')),
-            name: menu.menuName?.replace(/\s+/g, ''),
-            meta: { 
-              title: menu.menuName,
-              icon: menu.icon || 'Menu',
-              activeMenu: '/workbench'
-            }
-          }
-        ]
+    if (isCategoryComponent && menu.children && menu.children.length > 0) {
+      // 这是一个分类
+      const categoryTitle = menu.meta?.title || menu.name || '未命名分类'
+      
+      const category = {
+        id: menu.path,
+        title: categoryTitle,
+        orderNum: 0,
+        children: []
       }
       
-      // 检查路由是否已存在，避免重复注册
-      const existingRoute = router.getRoutes().find(r => r.path === fullPath)
-      if (!existingRoute) {
-        router.addRoute(dynamicRoute)
-        return fullPath
+      // 提取该分类下的功能菜单
+      menu.children.forEach(child => {
+        // 如果子菜单还有 children 且 component 是 Layout，需要递归处理
+        if (child.children && child.children.length > 0 && child.component === 'Layout') {
+          // 这是一个嵌套的分类，递归处理其 children
+          child.children.forEach(nestedChild => {
+            if (nestedChild.meta && nestedChild.meta.title) {
+              const fullPath = buildFullPath(child.path, nestedChild.path, menu.path, basePath)
+              
+              category.children.push({
+                title: nestedChild.meta.title,
+                icon: nestedChild.meta.icon,
+        path: fullPath,
+                orderNum: 0
+              })
+            }
+          })
+        } else if (child.meta && child.meta.title) {
+          // 检查是否是空菜单项（component 是 Layout 或 ParentView 但没有 children）
+          const isLayoutOrParentView = child.component === 'Layout' || child.component === 'ParentView'
+          const hasNoChildren = !child.children || child.children.length === 0
+          const isEmptyMenu = isLayoutOrParentView && hasNoChildren
+          
+          let fullPath = buildFullPath(child.path, null, menu.path, basePath)
+          
+          // 空菜单项会在 filterChildren 中自动处理
+          
+          category.children.push({
+            title: child.meta.title,
+            icon: child.meta.icon,
+            path: fullPath,
+            orderNum: 0
+          })
+        }
+      })
+      
+      // 只添加有子菜单的分类
+      if (category.children.length > 0) {
+        categories.push(category)
+            }
+          }
+  })
+  
+  return categories
       }
-    } catch (error) {
-      // 静默失败
+      
+// 构建完整路径的辅助函数
+const buildFullPath = (childPath, nestedPath, categoryPath, basePath) => {
+  let fullPath = nestedPath || childPath
+  
+  // 如果路径不是绝对路径，需要拼接
+  if (!fullPath || !fullPath.startsWith('/')) {
+    // 构建路径：/workbench + /分类路径 + /功能路径
+    const pathParts = [basePath]
+    
+    if (categoryPath && categoryPath !== 'workbench') {
+      pathParts.push(categoryPath.replace(/^\/+/, ''))
     }
+    
+    if (childPath && childPath !== 'workbench') {
+      pathParts.push(childPath.replace(/^\/+/, ''))
+    }
+    
+    if (nestedPath) {
+      pathParts.push(nestedPath.replace(/^\/+/, ''))
+    }
+    
+    fullPath = '/' + pathParts.filter(p => p).join('/')
   }
   
-  // 如果都没找到，返回构建的完整路径（可能需要在后端配置）
+  // 清理路径中的双斜杠
+  fullPath = fullPath.replace(/\/+/g, '/')
+  
   return fullPath
 }
 
-// 获取工作台菜单数据并转换为分类结构（基于菜单树，非路由）
+
+// 获取工作台菜单数据并转换为分类结构（从 getRouters 中提取）
 const getWorkbenchMenus = async () => {
   try {
-    // 同时获取菜单数据和已注册的路由数据
-    const [menuResponse, routerResponse] = await Promise.all([
-      listMenu(),
-      getRouters()
-    ])
+    // 优先从 permissionStore 获取已缓存的路由数据，避免重复请求
+    const permissionStore = usePermissionStore()
+    let registeredRoutes
     
-    const allMenus = menuResponse.data
-    const registeredRoutes = routerResponse.data
-
-    // 查找工作台父级菜单（兼容是否带斜杠）
-    const workbenchParent = allMenus.find(menu => menu.path === 'workbench' || menu.path === '/workbench')
-    if (!workbenchParent) return
-
-    // 1) 分类：父级为工作台且类型为目录(M)
-    const categories = allMenus
-      .filter(menu => 
-        menu.parentId === workbenchParent.menuId &&
-        menu.menuType === 'M' &&
-        menu.status === '0'
-      )
-      .map(categoryMenu => ({
-        id: categoryMenu.menuId,
-        title: categoryMenu.menuName,
-        orderNum: categoryMenu.orderNum || 0,
-        children: []
-      }))
-
-    // 2) 功能：父级为分类且类型为菜单(C)
-    const categoriesById = new Map(categories.map(c => [c.id, c]))
-    allMenus.forEach(menu => {
-      if (
-        menu.menuType === 'C' &&
-        menu.status === '0' &&
-        categoriesById.has(menu.parentId)
-      ) {
-        const category = categoriesById.get(menu.parentId)
-        // 从已注册的路由中查找匹配的路径
-        const registeredPath = findRegisteredPath(menu, allMenus, registeredRoutes)
-        
-        category.children.push({
-          title: menu.menuName,
-          icon: menu.icon,
-          path: registeredPath,
-          orderNum: menu.orderNum || 0
-        })
+    if (permissionStore.routersData) {
+      // 使用已缓存的数据
+      registeredRoutes = permissionStore.routersData
+    } else {
+      // 如果没有缓存，则请求并缓存
+      const { getRouters } = await import('@/api/menu')
+      const routerResponse = await getRouters()
+      registeredRoutes = routerResponse.data
+      permissionStore.routersData = registeredRoutes
+    }
+    
+    // 根据后端返回的数据结构：
+    // "/" 路由的 children 中：
+    // - 第一个是工作台主页面（path: 'workbench', component: 'workbench/index'）
+    // - 后续是工作台的子菜单（path: 'routine', 'asset' 等，component: 'ParentView' 或 'Layout'）
+    // 我们需要从 "/" 路由的 children 中提取工作台的子菜单（排除工作台主页面本身）
+    
+    let rootRoute = null
+    for (const route of registeredRoutes) {
+      if (route.path === '/' && route.children) {
+        rootRoute = route
+        break
       }
-    })
-
-    // 排序
-    categories.forEach(category => {
-      category.children.sort((a, b) => a.orderNum - b.orderNum)
-    })
-    categories.sort((a, b) => a.orderNum - b.orderNum)
+    }
+    
+    if (!rootRoute || !rootRoute.children || rootRoute.children.length === 0) {
+      workbenchCategories.value = []
+      return
+    }
+    
+    // 找到工作台主页面路由（component 是 'workbench/index' 的）
+    const workbenchMainRoute = rootRoute.children.find(child => 
+      (child.path === 'workbench' || child.path === '/workbench') &&
+      child.component === 'workbench/index' &&
+      (child.meta && child.meta.title === '工作台')
+    )
+    
+    if (!workbenchMainRoute) {
+      workbenchCategories.value = []
+      return
+    }
+    
+    // 提取工作台的子菜单（排除工作台主页面本身）
+    // 子菜单的特征：component 是 'ParentView' 或 'Layout'，且有 children
+    const subMenus = rootRoute.children.filter(child => {
+      // 排除工作台主页面
+      if (child === workbenchMainRoute) {
+        return false
+      }
+      // 只保留有 children 的子菜单（分类）
+      return child.children && child.children.length > 0
+        })
+    
+    if (subMenus.length === 0) {
+      workbenchCategories.value = []
+      return
+    }
+    
+    // 从路由数据中提取分类和功能菜单
+    const categories = extractCategoriesFromRoutes(subMenus, '/workbench')
 
     // 过滤空分类并赋值
     workbenchCategories.value = categories.filter(c => c.children.length > 0)
   } catch (error) {
-    // 静默失败，避免干扰页面
+    workbenchCategories.value = []
   }
 }
 

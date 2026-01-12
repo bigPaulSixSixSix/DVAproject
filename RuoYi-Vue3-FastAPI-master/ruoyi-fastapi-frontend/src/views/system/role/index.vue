@@ -168,6 +168,32 @@
                   >{{ dict.label }}</el-radio>
                </el-radio-group>
             </el-form-item>
+            <el-form-item label="数据权限">
+               <el-select v-model="form.dataScope" @change="dataScopeSelectChangeInForm" placeholder="请选择数据权限">
+                  <el-option
+                     v-for="item in dataScopeOptions"
+                     :key="item.value"
+                     :label="item.label"
+                     :value="item.value"
+                  ></el-option>
+               </el-select>
+            </el-form-item>
+            <el-form-item label="选择部门" v-show="form.dataScope == '2'">
+               <el-checkbox v-model="deptExpand" @change="handleCheckedTreeExpand($event, 'dept')">展开/折叠</el-checkbox>
+               <el-checkbox v-model="deptNodeAll" @change="handleCheckedTreeNodeAll($event, 'dept')">全选/全不选</el-checkbox>
+               <el-checkbox v-model="form.deptCheckStrictly" @change="handleCheckedTreeConnect($event, 'dept')">父子联动</el-checkbox>
+               <el-tree
+                  class="tree-border"
+                  :data="deptOptions"
+                  show-checkbox
+                  default-expand-all
+                  ref="deptRef"
+                  node-key="id"
+                  :check-strictly="!form.deptCheckStrictly"
+                  empty-text="加载中，请稍候"
+                  :props="{ label: 'label', children: 'children' }"
+               ></el-tree>
+            </el-form-item>
             <el-form-item label="菜单权限">
                <el-checkbox v-model="menuExpand" @change="handleCheckedTreeExpand($event, 'menu')">展开/折叠</el-checkbox>
                <el-checkbox v-model="menuNodeAll" @change="handleCheckedTreeNodeAll($event, 'menu')">全选/全不选</el-checkbox>
@@ -396,6 +422,7 @@ function reset() {
     roleKey: undefined,
     roleSort: 0,
     status: "0",
+    dataScope: "5",  // 默认：仅本人数据权限
     menuIds: [],
     deptIds: [],
     menuCheckStrictly: true,
@@ -408,6 +435,9 @@ function reset() {
 function handleAdd() {
   reset();
   getMenuTreeselect();
+  getDeptTree(0).then(() => {
+    // 加载部门树，用于自定义数据权限选择
+  });
   open.value = true;
   title.value = "添加角色";
 }
@@ -416,9 +446,14 @@ function handleUpdate(row) {
   reset();
   const roleId = row.roleId || ids.value;
   const roleMenu = getRoleMenuTreeselect(roleId);
+  const deptTreeSelect = getDeptTree(roleId);
   getRole(roleId).then(response => {
     form.value = response.data;
     form.value.roleSort = Number(form.value.roleSort);
+    // 确保 dataScope 有默认值
+    if (!form.value.dataScope) {
+      form.value.dataScope = "5";
+    }
     open.value = true;
     nextTick(() => {
       roleMenu.then((res) => {
@@ -429,6 +464,16 @@ function handleUpdate(row) {
           });
         });
       });
+      // 如果是自定义数据权限，加载已选中的部门
+      if (form.value.dataScope === "2") {
+        deptTreeSelect.then((res) => {
+          nextTick(() => {
+            if (deptRef.value) {
+              deptRef.value.setCheckedKeys(res.checkedKeys);
+            }
+          });
+        });
+      }
     });
   });
   title.value = "修改角色";
@@ -490,15 +535,25 @@ function getMenuAllCheckedKeys() {
 function submitForm() {
   proxy.$refs["roleRef"].validate(valid => {
     if (valid) {
+      // 设置菜单权限
+      form.value.menuIds = getMenuAllCheckedKeys();
+      // 如果是自定义数据权限，设置部门权限
+      if (form.value.dataScope === "2") {
+        form.value.deptIds = getDeptAllCheckedKeys();
+      } else {
+        form.value.deptIds = [];
+      }
+      // 确保 dataScope 有值
+      if (!form.value.dataScope) {
+        form.value.dataScope = "5";
+      }
       if (form.value.roleId != undefined) {
-        form.value.menuIds = getMenuAllCheckedKeys();
         updateRole(form.value).then(response => {
           proxy.$modal.msgSuccess("修改成功");
           open.value = false;
           getList();
         });
       } else {
-        form.value.menuIds = getMenuAllCheckedKeys();
         addRole(form.value).then(response => {
           proxy.$modal.msgSuccess("新增成功");
           open.value = false;
@@ -513,10 +568,28 @@ function cancel() {
   open.value = false;
   reset();
 }
-/** 选择角色权限范围触发 */
+/** 选择角色权限范围触发（数据权限对话框） */
 function dataScopeSelectChange(value) {
   if (value !== "2") {
     deptRef.value.setCheckedKeys([]);
+  }
+}
+/** 选择角色权限范围触发（角色编辑对话框） */
+function dataScopeSelectChangeInForm(value) {
+  if (value !== "2") {
+    // 如果不是自定义权限，清空部门选择
+    if (deptRef.value) {
+      deptRef.value.setCheckedKeys([]);
+    }
+    form.value.deptIds = [];
+  } else {
+    // 如果是自定义权限，确保部门树已加载
+    if (deptOptions.value.length === 0) {
+      const roleId = form.value.roleId || 0;
+      getDeptTree(roleId).then(() => {
+        // 部门树已加载
+      });
+    }
   }
 }
 /** 分配数据权限操作 */

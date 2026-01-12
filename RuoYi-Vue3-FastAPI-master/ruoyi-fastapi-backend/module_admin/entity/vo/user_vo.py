@@ -173,6 +173,10 @@ class UserPageQueryModel(UserQueryModel):
 
     page_num: int = Field(default=1, description='当前页码')
     page_size: int = Field(default=10, description='每页记录数')
+    job_number: Optional[str] = Field(default=None, description='工号查询')
+    employee_name: Optional[str] = Field(default=None, description='员工姓名查询')
+    rank_id: Optional[int] = Field(default=None, description='级别ID查询')
+    role_id: Optional[int] = Field(default=None, description='角色ID查询')
 
 
 class AddUserModel(UserModel):

@@ -1,7 +1,12 @@
 from fastapi import Depends
 from typing import Optional
+from sqlalchemy import func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from module_admin.entity.do.oa_department_do import OaDepartment
+from module_admin.entity.do.role_do import SysRoleDept
 from module_admin.entity.vo.user_vo import CurrentUserModel
 from module_admin.service.login_service import LoginService
+from config.get_db import get_db
 
 
 class GetDataScope:
@@ -35,9 +40,24 @@ class GetDataScope:
         self.user_alias = user_alias
         self.dept_alias = dept_alias
 
-    def __call__(self, current_user: CurrentUserModel = Depends(LoginService.get_current_user)):
+    async def __call__(
+        self,
+        current_user: CurrentUserModel = Depends(LoginService.get_current_user),
+        query_db: AsyncSession = Depends(get_db),
+    ):
         user_id = current_user.user.user_id
         dept_id = current_user.user.dept_id
+        
+        # 获取当前部门的 code（用于子部门查询）
+        # 管理员账户可能没有部门（dept_id 为 None）
+        dept_code = ''
+        if dept_id is not None:
+            dept = (
+                await query_db.execute(select(OaDepartment).where(OaDepartment.id == dept_id))
+            ).scalars().first()
+            if dept:
+                dept_code = dept.code or ''
+        
         custom_data_scope_role_id_list = [
             item.role_id for item in current_user.user.role if item.data_scope == self.DATA_SCOPE_CUSTOM
         ]
@@ -56,13 +76,28 @@ class GetDataScope:
                         f"{self.query_alias}.{self.dept_alias}.in_(select(SysRoleDept.dept_id).where(SysRoleDept.role_id == {role.role_id})) if hasattr({self.query_alias}, '{self.dept_alias}') else 1 == 0"
                     )
             elif role.data_scope == self.DATA_SCOPE_DEPT:
-                param_sql_list.append(
-                    f"{self.query_alias}.{self.dept_alias} == {dept_id} if hasattr({self.query_alias}, '{self.dept_alias}') else 1 == 0"
-                )
+                # 管理员账户可能没有部门
+                if dept_id is not None:
+                    param_sql_list.append(
+                        f"{self.query_alias}.{self.dept_alias} == {dept_id} if hasattr({self.query_alias}, '{self.dept_alias}') else 1 == 0"
+                    )
+                else:
+                    # 没有部门，返回空结果
+                    param_sql_list.append('1 == 0')
             elif role.data_scope == self.DATA_SCOPE_DEPT_AND_CHILD:
-                param_sql_list.append(
-                    f"{self.query_alias}.{self.dept_alias}.in_(select(SysDept.dept_id).where(or_(SysDept.dept_id == {dept_id}, func.find_in_set({dept_id}, SysDept.ancestors)))) if hasattr({self.query_alias}, '{self.dept_alias}') else 1 == 0"
-                )
+                # 使用 code LIKE 替代 ancestors 查询
+                if dept_id is not None and dept_code:
+                    param_sql_list.append(
+                        f"{self.query_alias}.{self.dept_alias}.in_(select(OaDepartment.id).where(or_(OaDepartment.id == {dept_id}, OaDepartment.code.like('{dept_code}%')))) if hasattr({self.query_alias}, '{self.dept_alias}') else 1 == 0"
+                    )
+                elif dept_id is not None:
+                    # 如果没有 code，只查询当前部门
+                    param_sql_list.append(
+                        f"{self.query_alias}.{self.dept_alias} == {dept_id} if hasattr({self.query_alias}, '{self.dept_alias}') else 1 == 0"
+                    )
+                else:
+                    # 没有部门，返回空结果
+                    param_sql_list.append('1 == 0')
             elif role.data_scope == self.DATA_SCOPE_SELF:
                 param_sql_list.append(
                     f"{self.query_alias}.{self.user_alias} == {user_id} if hasattr({self.query_alias}, '{self.user_alias}') else 1 == 0"
@@ -70,6 +105,6 @@ class GetDataScope:
             else:
                 param_sql_list.append('1 == 0')
         param_sql_list = list(dict.fromkeys(param_sql_list))
-        param_sql = f"or_({', '.join(param_sql_list)})"
+        param_sql = f"or_({', '.join(param_sql_list)})" if param_sql_list else '1 == 1'
 
         return param_sql

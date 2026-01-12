@@ -22,23 +22,35 @@ from module_admin.controller.post_controler import postController
 from module_admin.controller.role_controller import roleController
 from module_admin.controller.server_controller import serverController
 from module_admin.controller.user_controller import userController
+from module_admin.controller.sync_controller import syncController
 from module_generator.controller.gen_controller import genController
+from module_task.configuration.controller.task_controller import taskController
+from module_task.todo.controller.todo_controller import todoController
+from module_apply.controller.apply_controller import applyController
+from module_task.entity.do import ProjStage, ProjTask, TodoStage, TodoTask, TodoTaskApply  # 确保DO模型被注册到Base.metadata
+from module_apply.entity.do import ApplyPrimary, ApplyRules, ApplyLog  # 确保DO模型被注册到Base.metadata
 from sub_applications.handle import handle_sub_applications
 from utils.common_util import worship
 from utils.log_util import logger
+from module_admin.utils.init_admin_user import init_admin_user
 
 
 # 生命周期事件
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info(f'⏰️ {AppConfig.app_name}开始启动')
+    logger.info(f"⏰️ {AppConfig.app_name}开始启动")
     worship()
     await init_create_table()
+    # 初始化管理员账户
+    try:
+        await init_admin_user()
+    except Exception as e:
+        logger.warning(f"管理员账户初始化失败: {str(e)}")
     app.state.redis = await RedisUtil.create_redis_pool()
     await RedisUtil.init_sys_dict(app.state.redis)
     await RedisUtil.init_sys_config(app.state.redis)
     await SchedulerUtil.init_system_scheduler()
-    logger.info(f'🚀 {AppConfig.app_name}启动成功')
+    logger.info(f"🚀 {AppConfig.app_name}启动成功")
     yield
     await RedisUtil.close_redis_pool(app)
     await SchedulerUtil.close_system_scheduler()
@@ -47,7 +59,7 @@ async def lifespan(app: FastAPI):
 # 初始化FastAPI对象
 app = FastAPI(
     title=AppConfig.app_name,
-    description=f'{AppConfig.app_name}接口文档',
+    description=f"{AppConfig.app_name}接口文档",
     version=AppConfig.app_version,
     lifespan=lifespan,
 )
@@ -62,24 +74,28 @@ handle_exception(app)
 
 # 加载路由列表
 controller_list = [
-    {'router': loginController, 'tags': ['登录模块']},
-    {'router': captchaController, 'tags': ['验证码模块']},
-    {'router': userController, 'tags': ['系统管理-用户管理']},
-    {'router': roleController, 'tags': ['系统管理-角色管理']},
-    {'router': menuController, 'tags': ['系统管理-菜单管理']},
-    {'router': deptController, 'tags': ['系统管理-部门管理']},
-    {'router': postController, 'tags': ['系统管理-岗位管理']},
-    {'router': dictController, 'tags': ['系统管理-字典管理']},
-    {'router': configController, 'tags': ['系统管理-参数管理']},
-    {'router': noticeController, 'tags': ['系统管理-通知公告管理']},
-    {'router': logController, 'tags': ['系统管理-日志管理']},
-    {'router': onlineController, 'tags': ['系统监控-在线用户']},
-    {'router': jobController, 'tags': ['系统监控-定时任务']},
-    {'router': serverController, 'tags': ['系统监控-菜单管理']},
-    {'router': cacheController, 'tags': ['系统监控-缓存监控']},
-    {'router': commonController, 'tags': ['通用模块']},
-    {'router': genController, 'tags': ['代码生成']},
+    {"router": loginController, "tags": ["登录模块"]},
+    {"router": captchaController, "tags": ["验证码模块"]},
+    {"router": userController, "tags": ["系统管理-用户管理"]},
+    {"router": roleController, "tags": ["系统管理-角色管理"]},
+    {"router": menuController, "tags": ["系统管理-菜单管理"]},
+    {"router": deptController, "tags": ["系统管理-部门管理"]},
+    {"router": postController, "tags": ["系统管理-岗位管理（只读）"]},
+    {"router": dictController, "tags": ["系统管理-字典管理"]},
+    {"router": configController, "tags": ["系统管理-参数管理"]},
+    {"router": noticeController, "tags": ["系统管理-通知公告管理"]},
+    {"router": logController, "tags": ["系统管理-日志管理"]},
+    {"router": onlineController, "tags": ["系统监控-在线用户"]},
+    {"router": jobController, "tags": ["系统监控-定时任务"]},
+    {"router": serverController, "tags": ["系统监控-菜单管理"]},
+    {"router": cacheController, "tags": ["系统监控-缓存监控"]},
+    {"router": commonController, "tags": ["通用模块"]},
+    {"router": genController, "tags": ["代码生成"]},
+    {"router": taskController, "tags": ["任务配置"]},
+    {"router": todoController, "tags": ["任务执行"]},
+    {"router": applyController, "tags": ["通用申请/审批"]},
+    {"router": syncController, "tags": ["系统管理-数据同步"]},
 ]
 
 for controller in controller_list:
-    app.include_router(router=controller.get('router'), tags=controller.get('tags'))
+    app.include_router(router=controller.get("router"), tags=controller.get("tags"))

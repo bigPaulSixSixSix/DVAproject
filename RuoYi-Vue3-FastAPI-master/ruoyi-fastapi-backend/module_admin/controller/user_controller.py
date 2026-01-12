@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Literal, Optional, Union
 from pydantic_validation_decorator import ValidateFields
@@ -10,6 +10,7 @@ from config.env import UploadConfig
 from module_admin.annotation.log_annotation import Log
 from module_admin.aspect.data_scope import GetDataScope
 from module_admin.aspect.interface_auth import CheckUserInterfaceAuth
+from exceptions.exception import ServiceException
 from module_admin.entity.vo.dept_vo import DeptModel
 from module_admin.entity.vo.user_vo import (
     AddUserModel,
@@ -44,7 +45,7 @@ userController = APIRouter(prefix='/system/user', dependencies=[Depends(LoginSer
 
 @userController.get('/deptTree', dependencies=[Depends(CheckUserInterfaceAuth('system:user:list'))])
 async def get_system_dept_tree(
-    request: Request, query_db: AsyncSession = Depends(get_db), data_scope_sql: str = Depends(GetDataScope('SysDept'))
+    request: Request, query_db: AsyncSession = Depends(get_db), data_scope_sql: str = Depends(GetDataScope('OaDepartment', dept_alias='id'))
 ):
     dept_query_result = await DeptService.get_dept_tree_services(query_db, DeptModel(**{}), data_scope_sql)
     logger.info('获取成功')
@@ -59,7 +60,9 @@ async def get_system_user_list(
     request: Request,
     user_page_query: UserPageQueryModel = Depends(UserPageQueryModel.as_query),
     query_db: AsyncSession = Depends(get_db),
-    data_scope_sql: str = Depends(GetDataScope('SysUser')),
+    current_user: CurrentUserModel = Depends(LoginService.get_current_user),
+    # 注意：使用空字符串作为 query_alias，因为实际查询中需要通过 OaEmployeePrimary.organization_id 访问部门
+    data_scope_sql: str = Depends(GetDataScope('', dept_alias='organization_id')),
 ):
     # 获取分页数据
     user_page_query_result = await UserService.get_user_list_services(
@@ -68,86 +71,9 @@ async def get_system_user_list(
     logger.info('获取成功')
 
     return ResponseUtil.success(model_content=user_page_query_result)
-
-
-@userController.post('', dependencies=[Depends(CheckUserInterfaceAuth('system:user:add'))])
-@ValidateFields(validate_model='add_user')
-@Log(title='用户管理', business_type=BusinessType.INSERT)
-async def add_system_user(
-    request: Request,
-    add_user: AddUserModel,
-    query_db: AsyncSession = Depends(get_db),
-    current_user: CurrentUserModel = Depends(LoginService.get_current_user),
-    dept_data_scope_sql: str = Depends(GetDataScope('SysDept')),
-    role_data_scope_sql: str = Depends(GetDataScope('SysDept')),
-):
-    if not current_user.user.admin:
-        await DeptService.check_dept_data_scope_services(query_db, add_user.dept_id, dept_data_scope_sql)
-        await RoleService.check_role_data_scope_services(
-            query_db, ','.join([str(item) for item in add_user.role_ids]), role_data_scope_sql
-        )
-    add_user.password = PwdUtil.get_password_hash(add_user.password)
-    add_user.create_by = current_user.user.user_name
-    add_user.create_time = datetime.now()
-    add_user.update_by = current_user.user.user_name
-    add_user.update_time = datetime.now()
-    add_user_result = await UserService.add_user_services(query_db, add_user)
-    logger.info(add_user_result.message)
-
-    return ResponseUtil.success(msg=add_user_result.message)
-
-
-@userController.put('', dependencies=[Depends(CheckUserInterfaceAuth('system:user:edit'))])
-@ValidateFields(validate_model='edit_user')
-@Log(title='用户管理', business_type=BusinessType.UPDATE)
-async def edit_system_user(
-    request: Request,
-    edit_user: EditUserModel,
-    query_db: AsyncSession = Depends(get_db),
-    current_user: CurrentUserModel = Depends(LoginService.get_current_user),
-    user_data_scope_sql: str = Depends(GetDataScope('SysUser')),
-    dept_data_scope_sql: str = Depends(GetDataScope('SysDept')),
-    role_data_scope_sql: str = Depends(GetDataScope('SysDept')),
-):
-    await UserService.check_user_allowed_services(edit_user)
-    if not current_user.user.admin:
-        await UserService.check_user_data_scope_services(query_db, edit_user.user_id, user_data_scope_sql)
-        await DeptService.check_dept_data_scope_services(query_db, edit_user.dept_id, dept_data_scope_sql)
-        await RoleService.check_role_data_scope_services(
-            query_db, ','.join([str(item) for item in edit_user.role_ids]), role_data_scope_sql
-        )
-    edit_user.update_by = current_user.user.user_name
-    edit_user.update_time = datetime.now()
-    edit_user_result = await UserService.edit_user_services(query_db, edit_user)
-    logger.info(edit_user_result.message)
-
-    return ResponseUtil.success(msg=edit_user_result.message)
-
-
-@userController.delete('/{user_ids}', dependencies=[Depends(CheckUserInterfaceAuth('system:user:remove'))])
-@Log(title='用户管理', business_type=BusinessType.DELETE)
-async def delete_system_user(
-    request: Request,
-    user_ids: str,
-    query_db: AsyncSession = Depends(get_db),
-    current_user: CurrentUserModel = Depends(LoginService.get_current_user),
-    data_scope_sql: str = Depends(GetDataScope('SysUser')),
-):
-    user_id_list = user_ids.split(',') if user_ids else []
-    if user_id_list:
-        if current_user.user.user_id in list(map(int, user_id_list)):
-            logger.warning('当前登录用户不能删除')
-
-            return ResponseUtil.failure(msg='当前登录用户不能删除')
-        for user_id in user_id_list:
-            await UserService.check_user_allowed_services(UserModel(userId=int(user_id)))
-            if not current_user.user.admin:
-                await UserService.check_user_data_scope_services(query_db, int(user_id), data_scope_sql)
-    delete_user = DeleteUserModel(userIds=user_ids, updateBy=current_user.user.user_name, updateTime=datetime.now())
-    delete_user_result = await UserService.delete_user_services(query_db, delete_user)
-    logger.info(delete_user_result.message)
-
-    return ResponseUtil.success(msg=delete_user_result.message)
+# 保留的接口：
+# - PUT /system/user/resetPwd - 重置密码（密码管理，允许）
+# - PUT /system/user/changeStatus - 修改状态（本地用户表状态，允许）
 
 
 @userController.put('/resetPwd', dependencies=[Depends(CheckUserInterfaceAuth('system:user:resetPwd'))])
@@ -157,7 +83,7 @@ async def reset_system_user_pwd(
     reset_user: EditUserModel,
     query_db: AsyncSession = Depends(get_db),
     current_user: CurrentUserModel = Depends(LoginService.get_current_user),
-    data_scope_sql: str = Depends(GetDataScope('SysUser')),
+    data_scope_sql: str = Depends(GetDataScope('', user_alias='user_id')),
 ):
     await UserService.check_user_allowed_services(reset_user)
     if not current_user.user.admin:
@@ -183,8 +109,12 @@ async def change_system_user_status(
     change_user: EditUserModel,
     query_db: AsyncSession = Depends(get_db),
     current_user: CurrentUserModel = Depends(LoginService.get_current_user),
-    data_scope_sql: str = Depends(GetDataScope('SysUser')),
+    data_scope_sql: str = Depends(GetDataScope('', user_alias='user_id')),
 ):
+    # 禁止用户修改自己的状态（避免误操作导致无法登录）
+    if change_user.user_id == current_user.user.user_id:
+        raise ServiceException(message='不允许修改自己的状态')
+    
     await UserService.check_user_allowed_services(change_user)
     if not current_user.user.admin:
         await UserService.check_user_data_scope_services(query_db, change_user.user_id, data_scope_sql)
@@ -224,7 +154,7 @@ async def query_detail_system_user(
     user_id: Optional[Union[int, Literal['']]] = '',
     query_db: AsyncSession = Depends(get_db),
     current_user: CurrentUserModel = Depends(LoginService.get_current_user),
-    data_scope_sql: str = Depends(GetDataScope('SysUser')),
+    data_scope_sql: str = Depends(GetDataScope('', user_alias='user_id')),
 ):
     if user_id and not current_user.user.admin:
         await UserService.check_user_data_scope_services(query_db, user_id, data_scope_sql)
@@ -315,40 +245,13 @@ async def reset_system_user_password(
     return ResponseUtil.success(msg=reset_user_result.message)
 
 
-@userController.post('/importData', dependencies=[Depends(CheckUserInterfaceAuth('system:user:import'))])
-@Log(title='用户管理', business_type=BusinessType.IMPORT)
-async def batch_import_system_user(
-    request: Request,
-    file: UploadFile = File(...),
-    update_support: bool = Query(alias='updateSupport'),
-    query_db: AsyncSession = Depends(get_db),
-    current_user: CurrentUserModel = Depends(LoginService.get_current_user),
-    user_data_scope_sql: str = Depends(GetDataScope('SysUser')),
-    dept_data_scope_sql: str = Depends(GetDataScope('SysDept')),
-):
-    batch_import_result = await UserService.batch_import_user_services(
-        request, query_db, file, update_support, current_user, user_data_scope_sql, dept_data_scope_sql
-    )
-    logger.info(batch_import_result.message)
-
-    return ResponseUtil.success(msg=batch_import_result.message)
-
-
-@userController.post('/importTemplate', dependencies=[Depends(CheckUserInterfaceAuth('system:user:import'))])
-async def export_system_user_template(request: Request, query_db: AsyncSession = Depends(get_db)):
-    user_import_template_result = await UserService.get_user_import_template_services()
-    logger.info('获取成功')
-
-    return ResponseUtil.streaming(data=bytes2file_response(user_import_template_result))
-
-
 @userController.post('/export', dependencies=[Depends(CheckUserInterfaceAuth('system:user:export'))])
 @Log(title='用户管理', business_type=BusinessType.EXPORT)
 async def export_system_user_list(
     request: Request,
     user_page_query: UserPageQueryModel = Form(),
     query_db: AsyncSession = Depends(get_db),
-    data_scope_sql: str = Depends(GetDataScope('SysUser')),
+    data_scope_sql: str = Depends(GetDataScope('', user_alias='user_id')),
 ):
     # 获取全量数据
     user_query_result = await UserService.get_user_list_services(
@@ -387,8 +290,8 @@ async def update_system_role_user(
     role_ids: str = Query(alias='roleIds'),
     query_db: AsyncSession = Depends(get_db),
     current_user: CurrentUserModel = Depends(LoginService.get_current_user),
-    user_data_scope_sql: str = Depends(GetDataScope('SysUser')),
-    role_data_scope_sql: str = Depends(GetDataScope('SysDept')),
+    user_data_scope_sql: str = Depends(GetDataScope('', user_alias='user_id')),
+    role_data_scope_sql: str = Depends(GetDataScope('OaDepartment')),
 ):
     if not current_user.user.admin:
         await UserService.check_user_data_scope_services(query_db, user_id, user_data_scope_sql)

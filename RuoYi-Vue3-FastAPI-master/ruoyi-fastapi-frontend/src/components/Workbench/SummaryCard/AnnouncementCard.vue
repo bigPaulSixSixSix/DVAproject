@@ -5,7 +5,7 @@
     badge-text="2"
     badge-type="primary"
     icon-name="Bell"
-    icon-color="#409EFF"
+    icon-color="primary"
   />
 </template>
 

@@ -1,6 +1,7 @@
 import defaultSettings from '@/settings'
 import { useDark, useToggle } from '@vueuse/core'
 import { useDynamicTitle } from '@/utils/dynamicTitle'
+import { handleThemeStyle } from '@/utils/theme'
 
 const isDark = useDark()
 const toggleDark = useToggle(isDark)
@@ -44,6 +45,8 @@ const useSettingsStore = defineStore(
       toggleTheme() {
         this.isDark = !this.isDark
         toggleDark()
+        // 重新应用主题样式，以便在深色模式下正确处理颜色变量
+        handleThemeStyle(this.theme)
       }
     }
   })

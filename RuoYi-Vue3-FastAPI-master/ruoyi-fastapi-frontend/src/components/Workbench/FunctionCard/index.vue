@@ -102,12 +102,15 @@ const handleClick = () => {
   color: var(--el-text-color-primary);
   flex: 1;
   text-align: left;
+  align-items: center;
 }
 
 .function-arrow {
+  display: flex;
   position: absolute;
   top: 50%;
   right: 16px;
   transform: translateY(-50%);
+  align-items: center;
 }
 </style>
