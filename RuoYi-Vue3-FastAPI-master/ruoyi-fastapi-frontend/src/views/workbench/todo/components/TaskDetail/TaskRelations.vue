@@ -504,7 +504,12 @@ onUnmounted(() => {
   }
 
   .empty-state {
-    padding: 20px 0;
+    padding: 12px 0;
+    
+    // 覆盖 el-empty 组件的默认 padding
+    :deep(.el-empty) {
+      padding: 0 !important;
+    }
   }
 
     .relations-flow {

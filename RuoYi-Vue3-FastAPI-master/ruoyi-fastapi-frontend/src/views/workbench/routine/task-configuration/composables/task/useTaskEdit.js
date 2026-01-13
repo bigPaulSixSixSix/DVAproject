@@ -57,7 +57,19 @@ export const useTaskEdit = () => {
       { required: true, message: '请选择负责人', trigger: 'change' }
     ],
     approvalLevel: [
-      { required: true, message: '请选择审批层级', trigger: 'change' }
+      { 
+        validator: (rule, value, callback) => {
+          // 如果审批类型为"none"（无需审批），则审批层级不是必填项
+          if (taskEditForm.value.approvalType === 'none') {
+            callback()
+          } else if (!value && value !== 0) {
+            callback(new Error('请选择审批层级'))
+          } else {
+            callback()
+          }
+        },
+        trigger: 'change'
+      }
     ]
   }
 
@@ -270,6 +282,11 @@ export const useTaskEdit = () => {
    * @returns {Array} 审批节点数组
    */
   const calculateApprovalNodes = (approvalLevel, approvalType) => {
+    // 如果审批类型为"none"（无需审批），返回空数组
+    if (approvalType === 'none') {
+      return []
+    }
+
     if (!approvalLevel) {
       return []
     }
@@ -568,11 +585,17 @@ export const useTaskEdit = () => {
   }
 
   const createFormStateFromTask = (task) => {
-    // 从审批节点数组中提取最后一个作为选中的审批层级（用于显示）
+    // 获取审批类型
+    const approvalType = task.approvalType || 'sequential'
+    
+    // 如果审批类型为"none"（无需审批），审批层级为undefined
+    // 否则从审批节点数组中提取最后一个作为选中的审批层级（用于显示）
     // 如果是逐级审批，数组包含从负责人向上到选中编制的所有编制
     // 如果是指定编制审批，数组只包含一个编制ID
     const approvalNodes = Array.isArray(task.approvalNodes) ? task.approvalNodes : []
-    const approvalLevel = approvalNodes.length > 0 ? approvalNodes[approvalNodes.length - 1] : undefined
+    const approvalLevel = approvalType === 'none' 
+      ? undefined 
+      : (approvalNodes.length > 0 ? approvalNodes[approvalNodes.length - 1] : undefined)
 
     // 兼容旧数据：如果 task.assignee 存在，尝试转换为 jobNumber
     // 如果 task.jobNumber 存在，直接使用
@@ -597,7 +620,7 @@ export const useTaskEdit = () => {
       endTime: task.endTime ? formatDateFull(task.endTime) : null,
       duration: task.duration || 1,
       jobNumber: jobNumber,
-      approvalType: task.approvalType || 'sequential', // 默认逐级审批
+      approvalType: approvalType, // 使用计算出的审批类型
       approvalLevel: approvalLevel ? Number(approvalLevel) : undefined
     }
   }
@@ -851,10 +874,16 @@ export const useTaskEdit = () => {
     
     // 2. 准备任务数据（转换日期格式）
     // 根据审批类型和选中的审批层级，计算最终的审批节点数组
+    const approvalType = taskEditForm.value.approvalType || 'sequential'
     const approvalLevel = taskEditForm.value.approvalLevel
-    const approvalNodes = approvalLevel !== undefined && approvalLevel !== null
-      ? calculateApprovalNodes(approvalLevel, taskEditForm.value.approvalType)
-      : []
+    
+    // 如果审批类型为"none"（无需审批），审批节点为空数组
+    // 否则根据审批层级计算审批节点
+    const approvalNodes = approvalType === 'none'
+      ? []
+      : (approvalLevel !== undefined && approvalLevel !== null
+          ? calculateApprovalNodes(approvalLevel, approvalType)
+          : [])
     
     const taskData = {
       name: taskEditForm.value.name,
@@ -863,7 +892,7 @@ export const useTaskEdit = () => {
       endTime: taskEditForm.value.endTime ? parseDate(taskEditForm.value.endTime) : null,
       duration: taskEditForm.value.duration || 1,
       jobNumber: taskEditForm.value.jobNumber || null, // jobNumber 是工号（字符串）
-      approvalType: taskEditForm.value.approvalType || 'sequential',
+      approvalType: approvalType,
       approvalNodes: approvalNodes // 计算后的审批节点数组
     }
     

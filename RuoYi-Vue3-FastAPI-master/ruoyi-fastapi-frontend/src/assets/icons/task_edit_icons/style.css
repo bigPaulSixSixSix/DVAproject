@@ -1,5 +1,5 @@
 @font-face {
-  font-family: 'icomoon';
+  font-family: 'task-edit-icons';
   src:  url('fonts/icomoon.eot?cpxspv');
   src:  url('fonts/icomoon.eot?cpxspv#iefix') format('embedded-opentype'),
     url('fonts/icomoon.ttf?cpxspv') format('truetype'),
@@ -10,9 +10,15 @@
   font-display: block;
 }
 
-[class^="icon-"], [class*=" icon-"] {
+/* 工具栏图标样式 */
+.icon-add_stage,
+.icon-add_task,
+.icon-back,
+.icon-layout,
+.icon-save,
+.icon-save_generate {
   /* use !important to prevent issues with browser extensions that change fonts */
-  font-family: 'icomoon' !important;
+  font-family: 'task-edit-icons' !important;
   speak: never;
   font-style: normal;
   font-weight: normal;

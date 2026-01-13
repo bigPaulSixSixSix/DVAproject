@@ -162,31 +162,73 @@ class TodoService:
         }
         await TodoTaskApplyDao.create_apply(query_db, apply_data)
         
-        # 4. 获取审批节点
-        approval_nodes = []
-        if todo_task.approval_nodes:
-            try:
-                approval_nodes = json.loads(todo_task.approval_nodes) if isinstance(todo_task.approval_nodes, str) else todo_task.approval_nodes
-            except (json.JSONDecodeError, TypeError):
-                approval_nodes = []
-        
-        if not approval_nodes:
-            raise ServiceException(message='任务没有配置审批节点，无法提交')
-        
-        # 5. 调用审批引擎提交审批（传递回调函数，用于处理审批完成后的业务逻辑）
-        await ApprovalEngine.submit_for_approval(
-            query_db=query_db,
-            apply_id=apply_id,
-            approval_nodes=approval_nodes,
-            submitter_id=submitter_id,
-            callback=TodoService.handle_task_approved
+        # 4. 获取审批类型和审批节点（从 proj_task 表获取，因为 todo_task 表没有 approval_type 字段）
+        from module_task.entity.do.proj_task_do import ProjTask
+        proj_task_result = await query_db.execute(
+            select(ProjTask).where(ProjTask.task_id == task_id, ProjTask.enable == '1')
         )
+        proj_task = proj_task_result.scalar_one_or_none()
         
-        # 6. 更新任务状态为已提交
-        await TodoTaskDao.update_task_status(query_db, task_id, 2)  # 2-已提交
+        approval_type = None
+        approval_nodes = []
         
-        logger.info(f'任务提交成功: task_id={task_id}, apply_id={apply_id}')
-        return apply_id
+        if proj_task:
+            approval_type = proj_task.approval_type
+            if proj_task.approval_nodes:
+                try:
+                    approval_nodes = json.loads(proj_task.approval_nodes) if isinstance(proj_task.approval_nodes, str) else proj_task.approval_nodes
+                except (json.JSONDecodeError, TypeError):
+                    approval_nodes = []
+        
+        # 5. 判断是否需要审批
+        if approval_type == 'none':
+            # 无需审批模式：直接完成任务，不走审批流程
+            logger.info(f'任务无需审批，直接完成: task_id={task_id}, apply_id={apply_id}')
+            
+            # 更新任务状态为已提交（先标记为已提交，然后立即完成）
+            await TodoTaskDao.update_task_status(query_db, task_id, 2)  # 2-已提交
+            
+            # 直接完成任务（更新状态为完成，检查后置任务和阶段完成）
+            now = datetime.now()
+            await TodoTaskDao.update_task_status(
+                query_db, task_id, 3,  # 3-完成
+                actual_complete_time=now
+            )
+            logger.info(f'任务状态已更新为完成: task_id={task_id}, apply_id={apply_id}')
+            
+            # 检查后置任务
+            try:
+                await TodoService._check_and_activate_successor_tasks(query_db, task_id)
+            except Exception as e:
+                logger.error(f'检查后置任务失败: task_id={task_id}, error={str(e)}', exc_info=True)
+            
+            # 检查阶段完成
+            try:
+                await TodoService._check_and_activate_stages(query_db, todo_task.stage_id, todo_task.project_id)
+            except Exception as e:
+                logger.error(f'检查阶段完成失败: task_id={task_id}, stage_id={todo_task.stage_id}, error={str(e)}', exc_info=True)
+            
+            logger.info(f'任务提交成功（无需审批，已自动完成）: task_id={task_id}, apply_id={apply_id}')
+            return apply_id
+        else:
+            # 需要审批：检查审批节点
+            if not approval_nodes:
+                raise ServiceException(message='任务没有配置审批节点，无法提交')
+            
+            # 调用审批引擎提交审批（传递回调函数，用于处理审批完成后的业务逻辑）
+            await ApprovalEngine.submit_for_approval(
+                query_db=query_db,
+                apply_id=apply_id,
+                approval_nodes=approval_nodes,
+                submitter_id=submitter_id,
+                callback=TodoService.handle_task_approved
+            )
+            
+            # 更新任务状态为已提交
+            await TodoTaskDao.update_task_status(query_db, task_id, 2)  # 2-已提交
+            
+            logger.info(f'任务提交成功: task_id={task_id}, apply_id={apply_id}')
+            return apply_id
     
     @staticmethod
     async def handle_task_approved(

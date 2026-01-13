@@ -1,0 +1,80 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# 虚拟环境
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 日志文件
+logs/*.log
+*.log
+
+# 环境变量文件（敏感信息）
+.env
+.env.dev
+.env.prod
+.env.local
+.env.*.local
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose.*.yml
+
+# 文档
+*.md
+!README.md
+
+# 备份文件
+backup/
+*.bak
+*.backup
+
+# 测试文件
+test_*.py
+*_test.py
+tests/
+
+# 临时文件
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# 数据库初始化文件（可选，如果需要可以注释掉）
+# database_init/
+
+# 上传的文件（运行时生成）
+vf_admin/upload_path/*
+vf_admin/download_path/*
+vf_admin/gen_path/*
+vf_admin/task_test_data/*
+
+# 保留目录结构
+!vf_admin/upload_path/.gitkeep
+!vf_admin/download_path/.gitkeep
+!vf_admin/gen_path/.gitkeep
+!vf_admin/task_test_data/.gitkeep

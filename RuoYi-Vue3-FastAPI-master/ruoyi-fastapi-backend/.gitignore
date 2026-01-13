@@ -1,0 +1,77 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 环境变量文件（生产环境配置不应提交）
+.env.prod
+.env.local
+.env.*.local
+
+# 日志文件
+logs/
+*.log
+
+# 数据库
+*.db
+*.sqlite
+*.sqlite3
+
+# 上传文件
+vf_admin/upload_path/*
+vf_admin/download_path/*
+vf_admin/gen_path/*
+!vf_admin/upload_path/.gitkeep
+!vf_admin/download_path/.gitkeep
+!vf_admin/gen_path/.gitkeep
+
+# 测试数据
+vf_admin/task_test_data/
+vf_admin/routers_test.json
+
+# 缓存
+caches/
+.cache/
+.pytest_cache/
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# 备份文件
+backup/*.sql
+backup/*.bak
+
+# 临时文件
+*.tmp
+*.temp

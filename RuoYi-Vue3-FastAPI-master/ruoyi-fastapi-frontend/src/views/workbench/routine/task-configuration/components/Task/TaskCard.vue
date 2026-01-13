@@ -256,7 +256,11 @@ const hasMissingRequiredFields = computed(() => {
   const task = props.task
   // 检查关键字段是否为null或空
   // 检查审批节点是否配置：approvalNodes 应该是数组，如果为空数组或不存在，则认为未配置
-  const hasApprovalNodes = task.approvalNodes && Array.isArray(task.approvalNodes) && task.approvalNodes.length > 0
+  // 但如果审批类型为"none"（无需审批），则不需要检查审批层级
+  const approvalType = task.approvalType || 'sequential'
+  const hasApprovalNodes = approvalType === 'none' 
+    ? true // 无需审批时，认为审批节点已配置
+    : (task.approvalNodes && Array.isArray(task.approvalNodes) && task.approvalNodes.length > 0)
   return !task.startTime || !task.endTime || (!task.jobNumber && !task.assignee) || !hasApprovalNodes // 兼容旧数据
 })
 

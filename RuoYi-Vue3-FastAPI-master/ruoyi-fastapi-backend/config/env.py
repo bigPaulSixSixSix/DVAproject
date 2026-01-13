@@ -4,7 +4,7 @@ import os
 import sys
 from dotenv import load_dotenv
 from functools import lru_cache
-from pydantic import computed_field
+from pydantic import Field, computed_field
 from pydantic_settings import BaseSettings
 from typing import Literal
 
@@ -12,48 +12,49 @@ from typing import Literal
 class AppSettings(BaseSettings):
     """
     应用配置
+    所有配置必须从环境变量读取，不使用代码默认值
     """
 
-    app_env: str = "dev"
-    app_name: str = "RuoYi-FasAPI"
-    app_root_path: str = "/dev-api"
-    app_host: str = "0.0.0.0"
-    app_port: int = 9099
-    app_version: str = "1.0.0"
-    app_reload: bool = True
-    app_ip_location_query: bool = True
-    app_same_time_login: bool = True
+    app_env: str = Field(..., description="应用运行环境")
+    app_name: str = Field(..., description="应用名称")
+    app_root_path: str = Field(..., description="应用代理路径")
+    app_host: str = Field(..., description="应用主机")
+    app_port: int = Field(..., description="应用端口")
+    app_version: str = Field(..., description="应用版本")
+    app_reload: bool = Field(..., description="应用是否开启热重载")
+    app_ip_location_query: bool = Field(..., description="应用是否开启IP归属区域查询")
+    app_same_time_login: bool = Field(..., description="应用是否允许账号同时登录")
 
 
 class JwtSettings(BaseSettings):
     """
     Jwt配置
+    所有配置必须从环境变量读取，不使用代码默认值
     """
 
-    jwt_secret_key: str = (
-        "b01c66dc2c58dc6a0aabfe2144256be36226de378bf87f72c0c795dda67f4d55"
-    )
-    jwt_algorithm: str = "HS256"
-    jwt_expire_minutes: int = 1440
-    jwt_redis_expire_minutes: int = 30
+    jwt_secret_key: str = Field(..., description="Jwt秘钥")
+    jwt_algorithm: str = Field(..., description="Jwt算法")
+    jwt_expire_minutes: int = Field(..., description="令牌过期时间（分钟）")
+    jwt_redis_expire_minutes: int = Field(..., description="redis中令牌过期时间（分钟）")
 
 
 class DataBaseSettings(BaseSettings):
     """
     数据库配置
+    所有配置必须从环境变量读取，不使用代码默认值
     """
 
-    db_type: Literal["mysql", "postgresql"] = "mysql"
-    db_host: str = "127.0.0.1"
-    db_port: int = 3306
-    db_username: str = "root"
-    db_password: str = "root1234"
-    db_database: str = "ruoyi-fastapi"
-    db_echo: bool = False
-    db_max_overflow: int = 10
-    db_pool_size: int = 50
-    db_pool_recycle: int = 3600
-    db_pool_timeout: int = 30
+    db_type: Literal["mysql", "postgresql"] = Field(..., description="数据库类型")
+    db_host: str = Field(..., description="数据库主机")
+    db_port: int = Field(..., description="数据库端口")
+    db_username: str = Field(..., description="数据库用户名")
+    db_password: str = Field(..., description="数据库密码")
+    db_database: str = Field(..., description="数据库名称")
+    db_echo: bool = Field(..., description="是否开启sqlalchemy日志")
+    db_max_overflow: int = Field(..., description="允许溢出连接池大小的最大连接数")
+    db_pool_size: int = Field(..., description="连接池大小")
+    db_pool_recycle: int = Field(..., description="连接回收时间（秒）")
+    db_pool_timeout: int = Field(..., description="连接池等待超时时间（秒）")
 
     @computed_field
     @property
@@ -66,13 +67,14 @@ class DataBaseSettings(BaseSettings):
 class RedisSettings(BaseSettings):
     """
     Redis配置
+    所有配置必须从环境变量读取，不使用代码默认值
     """
 
-    redis_host: str = "127.0.0.1"
-    redis_port: int = 6379
-    redis_username: str = ""
-    redis_password: str = ""
-    redis_database: int = 2
+    redis_host: str = Field(..., description="Redis主机")
+    redis_port: int = Field(..., description="Redis端口")
+    redis_username: str = Field(default="", description="Redis用户名")
+    redis_password: str = Field(default="", description="Redis密码")
+    redis_database: int = Field(..., description="Redis数据库编号")
 
 
 class GenSettings:
@@ -216,7 +218,9 @@ class GetConfig:
             if "settings" in ini_config:
                 # 获取env选项
                 env_value = ini_config["settings"].get("env")
-                os.environ["APP_ENV"] = env_value if env_value else "dev"
+                # 如果alembic.ini中未设置env，不设置APP_ENV（默认加载.env.prod）
+                if env_value:
+                    os.environ["APP_ENV"] = env_value
         elif "uvicorn" in sys.argv[0]:
             # 使用uvicorn启动时，命令行参数需要按照uvicorn的文档进行配置，无法自定义参数
             pass
@@ -226,12 +230,13 @@ class GetConfig:
             parser.add_argument("--env", type=str, default="", help="运行环境")
             # 解析命令行参数
             args = parser.parse_args()
-            # 设置环境变量，如果未设置命令行参数，默认APP_ENV为dev
-            os.environ["APP_ENV"] = args.env if args.env else "dev"
+            # 设置环境变量，如果未设置命令行参数，不设置APP_ENV（默认加载.env.prod）
+            if args.env:
+                os.environ["APP_ENV"] = args.env
         # 读取运行环境
         run_env = os.environ.get("APP_ENV", "")
-        # 运行环境未指定时默认加载.env.dev
-        env_file = ".env.dev"
+        # 运行环境未指定时默认加载.env.prod（生产环境配置）
+        env_file = ".env.prod"
         # 运行环境不为空时按命令行参数加载对应.env文件
         if run_env != "":
             env_file = f".env.{run_env}"

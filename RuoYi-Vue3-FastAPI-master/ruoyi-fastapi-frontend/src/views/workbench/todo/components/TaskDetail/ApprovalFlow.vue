@@ -2,7 +2,7 @@
   <div class="approval-flow-card">
     <div class="section-title">审批流程</div>
     <div v-if="!approvalFlow" class="empty-state">
-      <el-empty description="该任务无审批流程" :image-size="60" />
+      <el-empty description="该任务无需审批，提交即通过" :image-size="60" />
     </div>
     <el-steps v-else :active="getActiveStepIndex()" finish-status="success" process-status="process" :align-center="false">
       <el-step
@@ -169,7 +169,12 @@ const getActiveStepIndex = () => {
   }
 
   .empty-state {
-    padding: 20px 0;
+    padding: 12px 0;
+    
+    // 覆盖 el-empty 组件的默认 padding
+    :deep(.el-empty) {
+      padding: 0 !important;
+    }
   }
 
   // 审批流容器样式（只保留布局相关样式，不覆盖状态颜色）

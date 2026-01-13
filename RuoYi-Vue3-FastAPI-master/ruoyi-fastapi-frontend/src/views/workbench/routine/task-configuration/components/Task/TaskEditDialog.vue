@@ -133,6 +133,10 @@
                   label="指定编制审批"
                   value="specified"
                 />
+                <el-option
+                  label="无需审批"
+                  value="none"
+                />
               </el-select>
               <!-- 第二个选项框：审批层级树形选择（单选） -->
               <el-tree-select
@@ -141,7 +145,7 @@
                 :data="approvalLevelTree"
                 :props="{ label: 'label', children: 'children', value: 'id' }"
                 placeholder="请选择审批层级"
-                :disabled="!isEditable || (form.jobNumber && approvalLevelTree.length === 0)"
+                :disabled="!isEditable || form.approvalType === 'none' || (form.jobNumber && approvalLevelTree.length === 0)"
                 style="flex: 1 1 auto; min-width: 200px;"
                 clearable
                 check-strictly
@@ -575,6 +579,16 @@ const {
 const dynamicRules = computed(() => {
   return getDynamicRules(props.rules)
 })
+
+// 监听审批类型变化，当选择"无需审批"时清空审批层级
+watch(() => props.form.approvalType, (newValue) => {
+  if (newValue === 'none') {
+    // 使用 nextTick 确保在 v-model 更新后再清空审批层级
+    nextTick(() => {
+      form.approvalLevel = undefined
+    })
+  }
+}, { immediate: false })
 
 // 键盘事件处理函数（emit 事件给父组件）
 const handleFormEnter = (event) => {

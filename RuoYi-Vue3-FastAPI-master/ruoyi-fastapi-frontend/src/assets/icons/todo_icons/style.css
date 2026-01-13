@@ -1,5 +1,5 @@
 @font-face {
-  font-family: 'icomoon';
+  font-family: 'todo-icons';
   src:  url('fonts/icomoon.eot?pt20wu');
   src:  url('fonts/icomoon.eot?pt20wu#iefix') format('embedded-opentype'),
     url('fonts/icomoon.ttf?pt20wu') format('truetype'),
@@ -10,9 +10,9 @@
   font-display: block;
 }
 
-[class^="icon-"], [class*=" icon-"] {
+[class^="icon-ic_todo_"], [class*=" icon-ic_todo_"] {
   /* use !important to prevent issues with browser extensions that change fonts */
-  font-family: 'icomoon' !important;
+  font-family: 'todo-icons' !important;
   speak: never;
   font-style: normal;
   font-weight: normal;

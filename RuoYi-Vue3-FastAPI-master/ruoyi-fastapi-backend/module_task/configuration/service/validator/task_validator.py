@@ -377,15 +377,25 @@ class TaskValidator:
         # 1. 检查信息缺失（负责人、开始时间、结束时间、审批层级）
         job_number_empty = task.job_number is None or (isinstance(task.job_number, str) and task.job_number.strip() == '')
         
+        # 检查审批节点是否为空
+        # 特殊情况：如果审批类型为"none"（无需审批），则允许审批节点为空
         approval_nodes_empty = False
-        if task.approval_nodes:
-            try:
-                approval_nodes_list = json.loads(task.approval_nodes) if isinstance(task.approval_nodes, str) else task.approval_nodes
-                approval_nodes_empty = not approval_nodes_list or len(approval_nodes_list) == 0
-            except (json.JSONDecodeError, TypeError):
-                approval_nodes_empty = True
+        approval_type = getattr(task, 'approval_type', None)
+        is_no_approval = approval_type == 'none'
+        
+        if is_no_approval:
+            # 无需审批模式：允许审批节点为空
+            approval_nodes_empty = False
         else:
-            approval_nodes_empty = True
+            # 其他审批模式：必须配置审批节点
+            if task.approval_nodes:
+                try:
+                    approval_nodes_list = json.loads(task.approval_nodes) if isinstance(task.approval_nodes, str) else task.approval_nodes
+                    approval_nodes_empty = not approval_nodes_list or len(approval_nodes_list) == 0
+                except (json.JSONDecodeError, TypeError):
+                    approval_nodes_empty = True
+            else:
+                approval_nodes_empty = True
         
         if job_number_empty or task.start_time is None or task.end_time is None or approval_nodes_empty:
             result['has_missing_info'] = True

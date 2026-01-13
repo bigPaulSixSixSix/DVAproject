@@ -40,8 +40,12 @@ export const useAbnormalTasks = (stagesSource, unassignedTasksSource) => {
       if (!task.endTime) missingFields.push('结束时间')
       if (!task.jobNumber && !task.assignee) missingFields.push('负责人') // 兼容旧数据
       // 检查审批节点是否配置：approvalNodes 应该是数组，如果为空数组或不存在，则认为未配置
-      if (!task.approvalNodes || !Array.isArray(task.approvalNodes) || task.approvalNodes.length === 0) {
-        missingFields.push('审批层级')
+      // 但如果审批类型为"none"（无需审批），则不需要检查审批层级
+      const approvalType = task.approvalType || 'sequential'
+      if (approvalType !== 'none') {
+        if (!task.approvalNodes || !Array.isArray(task.approvalNodes) || task.approvalNodes.length === 0) {
+          missingFields.push('审批层级')
+        }
       }
       if (missingFields.length > 0) {
         reasons.push(`信息缺失：${missingFields.join('、')}`)

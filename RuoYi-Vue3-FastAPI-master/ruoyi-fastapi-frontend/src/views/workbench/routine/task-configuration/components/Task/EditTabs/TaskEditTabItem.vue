@@ -75,7 +75,11 @@ const hasMissingRequiredFields = computed(() => {
   if (!formState) return true
   // 检查关键字段是否为null或空
   // 检查审批层级是否配置：approvalLevel 如果为 undefined 或 null，则认为未配置
-  const hasApprovalLevel = formState.approvalLevel !== undefined && formState.approvalLevel !== null
+  // 但如果审批类型为"none"（无需审批），则不需要检查审批层级
+  const approvalType = formState.approvalType || 'sequential'
+  const hasApprovalLevel = approvalType === 'none' 
+    ? true // 无需审批时，认为审批层级已配置
+    : (formState.approvalLevel !== undefined && formState.approvalLevel !== null)
   return !formState.startTime || !formState.endTime || (!formState.jobNumber && !formState.assignee) || !hasApprovalLevel // 兼容旧数据
 })
 
