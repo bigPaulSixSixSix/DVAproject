@@ -76,7 +76,7 @@
 </template>
 
 <script setup>
-import { ElMessageBox } from "element-plus";
+import { ElMessageBox, ElMessage } from "element-plus";
 import { getCodeImg, register } from "@/api/login";
 
 const title = import.meta.env.VITE_APP_TITLE;
@@ -146,9 +146,18 @@ function getCode() {
   getCodeImg().then(res => {
     captchaEnabled.value = res.captchaEnabled === undefined ? true : res.captchaEnabled;
     if (captchaEnabled.value) {
-      codeUrl.value = "data:image/gif;base64," + res.img;
-      registerForm.value.uuid = res.uuid;
+      // 添加防御性检查，确保 res.img 存在
+      if (res.img) {
+        codeUrl.value = "data:image/gif;base64," + res.img;
+        registerForm.value.uuid = res.uuid;
+      } else {
+        console.error('验证码图片数据为空', res);
+        ElMessage.error('获取验证码失败，请检查后端服务是否正常');
+      }
     }
+  }).catch(error => {
+    console.error('获取验证码失败:', error);
+    ElMessage.error('获取验证码失败: ' + (error.message || '未知错误'));
   });
 }
 

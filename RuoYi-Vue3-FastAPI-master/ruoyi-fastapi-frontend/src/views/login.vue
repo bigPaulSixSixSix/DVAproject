@@ -69,6 +69,7 @@ import { getCodeImg } from "@/api/login";
 import Cookies from "js-cookie";
 import { encrypt, decrypt } from "@/utils/jsencrypt";
 import useUserStore from '@/store/modules/user'
+import { ElMessage } from 'element-plus'
 
 const title = import.meta.env.VITE_APP_TITLE;
 const userStore = useUserStore();
@@ -143,9 +144,18 @@ function getCode() {
     captchaEnabled.value = res.captchaEnabled === undefined ? true : res.captchaEnabled;
     register.value = res.registerEnabled === undefined ? false : res.registerEnabled;
     if (captchaEnabled.value) {
-      codeUrl.value = "data:image/gif;base64," + res.img;
-      loginForm.value.uuid = res.uuid;
+      // 添加防御性检查，确保 res.img 存在
+      if (res.img) {
+        codeUrl.value = "data:image/gif;base64," + res.img;
+        loginForm.value.uuid = res.uuid;
+      } else {
+        console.error('验证码图片数据为空', res);
+        ElMessage.error('获取验证码失败，请检查后端服务是否正常');
+      }
     }
+  }).catch(error => {
+    console.error('获取验证码失败:', error);
+    ElMessage.error('获取验证码失败: ' + (error.message || '未知错误'));
   });
 }
 

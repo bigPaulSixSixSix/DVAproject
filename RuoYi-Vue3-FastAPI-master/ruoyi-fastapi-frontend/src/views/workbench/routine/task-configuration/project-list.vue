@@ -7,20 +7,20 @@
       style="width: 100%"
       @row-click="handleRowClick"
     >
-      <el-table-column prop="code" label="序号" width="120" align="center" />
-      <el-table-column prop="name" label="项目名称" min-width="120" />
-      <el-table-column prop="projectStatus" label="项目状态" width="120" align="center">
+      <el-table-column prop="code" label="序号" align="center" />
+      <el-table-column prop="name" label="项目名称" width="100" />
+      <el-table-column prop="projectStatus" label="项目状态" width="100" align="center">
         <template #default="{ row }">
           <el-tag :type="getProjectStatusType(row.projectStatus)">
             {{ row.projectStatus || '-' }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="missingInfoCount" label="信息缺失数" width="150" align="center" />
-      <el-table-column prop="timeRelationErrorCount" label="时间异常数" width="150" align="center" />
-      <el-table-column prop="unassignedStageCount" label="未分配到阶段数" width="150" align="center" />
-      <el-table-column prop="stageCount" label="阶段数量" width="150" align="center" />
-      <el-table-column prop="taskCount" label="任务数量" width="150" align="center" />
+      <el-table-column prop="missingInfoCount" label="信息缺失数" align="center" />
+      <el-table-column prop="timeRelationErrorCount" label="时间异常数" align="center" />
+      <el-table-column prop="unassignedStageCount" label="未分配到阶段数" align="center" />
+      <el-table-column prop="stageCount" label="阶段数量" align="center" />
+      <el-table-column prop="taskCount" label="任务数量" align="center" />
       <el-table-column prop="createTime" label="创建时间" width="180" align="center">
         <template #default="{ row }">
           {{ formatDateTime(row.createTime) }}
@@ -31,7 +31,7 @@
           {{ formatDateTime(row.updateTime) }}
         </template>
       </el-table-column>
-      <el-table-column prop="tasksGenerated" label="任务状态" width="120" align="center">
+      <el-table-column prop="tasksGenerated" label="任务状态" width="100" align="center">
         <template #default="{ row }">
           <el-tag :type="row.tasksGenerated ? 'success' : 'info'">
             {{ row.tasksGenerated ? '已生成' : '未生成' }}
@@ -197,11 +197,14 @@ onMounted(() => {
 .app-container {
   padding: 20px;
   background: transparent;
+  width: 100%;
 }
 
 :deep(.el-table) {
   cursor: pointer;
   background: transparent;
+  width: 100%;
+  table-layout: auto;
 }
 
 :deep(.el-table__row) {
@@ -210,6 +213,11 @@ onMounted(() => {
 
 :deep(.el-table__row:hover) {
   background-color: var(--el-table-row-hover-bg-color);
+}
+
+/* 确保计数列均分剩余空间 */
+:deep(.el-table__body-wrapper) {
+  width: 100%;
 }
 </style>
 

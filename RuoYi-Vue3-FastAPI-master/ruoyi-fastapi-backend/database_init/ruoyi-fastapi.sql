@@ -1,10 +1,25 @@
-mysqldump: [Warning] Using a password on the command line interface can be insecure.
+-- ============================================
+-- RuoYi-FastAPI 数据库初始化脚本
+-- ============================================
 -- MySQL dump 10.13  Distrib 8.0.43, for macos15 (x86_64)
 --
 -- Host: 127.0.0.1    Database: ruoyi-fastapi
 -- ------------------------------------------------------
 -- Server version	8.0.43
 
+-- ============================================
+-- 创建数据库（如果不存在）
+-- ============================================
+CREATE DATABASE IF NOT EXISTS `ruoyi-fastapi` 
+  DEFAULT CHARACTER SET utf8mb4 
+  DEFAULT COLLATE utf8mb4_0900_ai_ci;
+
+-- 使用数据库
+USE `ruoyi-fastapi`;
+
+-- ============================================
+-- 设置SQL模式和环境变量
+-- ============================================
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
 /*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
