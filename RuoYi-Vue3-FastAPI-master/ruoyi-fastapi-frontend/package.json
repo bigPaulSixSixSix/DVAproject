@@ -1,7 +1,7 @@
 {
-  "name": "vfadmin",
+  "name": "engineering-system",
   "version": "1.7.2",
-  "description": "vfadmin管理系统 - 基于Vue3+Element Plus的现代化管理系统，支持动态工作台、权限管理、系统监控等功能",
+  "description": "工程系统 - 基于Vue3+Element Plus的现代化管理系统，支持动态工作台、权限管理、系统监控等功能",
   "author": "insistence",
   "license": "MIT",
   "type": "module",

@@ -261,7 +261,7 @@ class DictDataService:
         :param redis: redis对象
         :return:
         """
-        # 获取以sys_dict:开头的键列表
+        # 获取以ce_sys_dict:开头的键列表
         keys = await redis.keys(f'{RedisInitKeyConfig.SYS_DICT.key}:*')
         # 删除匹配的键
         if keys:

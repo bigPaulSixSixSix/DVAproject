@@ -220,9 +220,10 @@ class LoginLogService:
 
     @classmethod
     async def unlock_user_services(cls, request: Request, unlock_user: UnlockUser):
-        locked_user = await request.app.state.redis.get(f'account_lock:{unlock_user.user_name}')
+        from config.enums import RedisInitKeyConfig
+        locked_user = await request.app.state.redis.get(f'{RedisInitKeyConfig.ACCOUNT_LOCK.key}:{unlock_user.user_name}')
         if locked_user:
-            await request.app.state.redis.delete(f'account_lock:{unlock_user.user_name}')
+            await request.app.state.redis.delete(f'{RedisInitKeyConfig.ACCOUNT_LOCK.key}:{unlock_user.user_name}')
             return CrudResponseModel(is_success=True, message='解锁成功')
         else:
             raise ServiceException(message='该用户未锁定')
