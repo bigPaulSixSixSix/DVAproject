@@ -88,11 +88,11 @@
 
 ```bash
 # 方法1: 使用mysql命令行
-mysql -u root -p ruoyi-fastapi < database_init/ruoyi-fastapi.sql
+mysql -u root -p DreamPlazaConstructionEngineering < database_init/ruoyi-fastapi.sql
 
 # 方法2: 使用mysql客户端
 mysql -u root -p
-use ruoyi-fastapi;
+use DreamPlazaConstructionEngineering;
 source database_init/ruoyi-fastapi.sql;
 ```
 
@@ -100,7 +100,7 @@ source database_init/ruoyi-fastapi.sql;
 
 ```bash
 # 使用psql命令行
-psql -U postgres -d ruoyi-fastapi -f database_init/ruoyi-fastapi-pg.sql
+psql -U postgres -d DreamPlazaConstructionEngineering -f database_init/ruoyi-fastapi-pg.sql
 ```
 
 ---

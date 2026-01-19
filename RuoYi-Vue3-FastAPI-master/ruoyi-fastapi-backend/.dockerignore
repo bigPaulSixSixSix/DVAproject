@@ -27,10 +27,13 @@ logs/*.log
 *.log
 
 # 环境变量文件（敏感信息）
+# 注意：.env.local 和 .env.dev 需要在构建时复制到镜像中（用于local/dev环境）
+# .env.prod 不打包（生产环境保持安全，运行时挂载）
 .env
-.env.dev
+# 允许 .env.local 和 .env.dev 被复制（用于构建时打包）
+!.env.local
+!.env.dev
 .env.prod
-.env.local
 .env.*.local
 
 # Git

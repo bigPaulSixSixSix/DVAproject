@@ -21,6 +21,7 @@ from module_admin.entity.vo.job_vo import JobLogModel, JobModel
 from module_admin.service.job_log_service import JobLogService
 from utils.log_util import logger
 import module_task  # noqa: F401
+import module_admin.service.external_sync_job  # noqa: F401  # 导入外部数据库同步任务
 
 
 # 重写Cron定时

@@ -77,6 +77,20 @@ class RedisSettings(BaseSettings):
     redis_database: int = Field(..., description="Redis数据库编号")
 
 
+class SourceDataBaseSettings(BaseSettings):
+    """
+    源数据库配置（用于同步外部数据库数据）
+    所有配置必须从环境变量读取，不使用代码默认值
+    """
+
+    source_db_type: Literal["mysql", "postgresql"] = Field(default="mysql", description="源数据库类型")
+    source_db_host: str = Field(default="", description="源数据库主机")
+    source_db_port: int = Field(default=3306, description="源数据库端口")
+    source_db_username: str = Field(default="", description="源数据库用户名")
+    source_db_password: str = Field(default="", description="源数据库密码")
+    source_db_database: str = Field(default="", description="源数据库名称")
+
+
 class GenSettings:
     """
     代码生成配置
@@ -206,6 +220,14 @@ class GetConfig:
         # 实例上传配置
         return UploadSettings()
 
+    @lru_cache()
+    def get_source_database_config(self):
+        """
+        获取源数据库配置
+        """
+        # 实例化源数据库配置模型
+        return SourceDataBaseSettings()
+
     @staticmethod
     def parse_cli_args():
         """
@@ -218,7 +240,7 @@ class GetConfig:
             if "settings" in ini_config:
                 # 获取env选项
                 env_value = ini_config["settings"].get("env")
-                # 如果alembic.ini中未设置env，不设置APP_ENV（默认加载.env.prod）
+                # 如果alembic.ini中未设置env，不设置APP_ENV（默认加载.env.local）
                 if env_value:
                     os.environ["APP_ENV"] = env_value
         elif "uvicorn" in sys.argv[0]:
@@ -230,16 +252,24 @@ class GetConfig:
             parser.add_argument("--env", type=str, default="", help="运行环境")
             # 解析命令行参数
             args = parser.parse_args()
-            # 设置环境变量，如果未设置命令行参数，不设置APP_ENV（默认加载.env.prod）
+            # 设置环境变量，如果未设置命令行参数，不设置APP_ENV（默认加载.env.local）
             if args.env:
                 os.environ["APP_ENV"] = args.env
         # 读取运行环境
         run_env = os.environ.get("APP_ENV", "")
-        # 运行环境未指定时默认加载.env.prod（生产环境配置）
-        env_file = ".env.prod"
-        # 运行环境不为空时按命令行参数加载对应.env文件
-        if run_env != "":
-            env_file = f".env.{run_env}"
+        
+        # 优先检查是否存在 .env.run 文件（用于本地直接运行，非 Docker 环境）
+        # 如果存在 .env.run，则使用它；否则按正常逻辑加载
+        if os.path.exists(".env.run") and run_env == "":
+            # 本地直接运行时，优先使用 .env.run（包含本地主机地址配置）
+            env_file = ".env.run"
+        else:
+            # 运行环境未指定时默认加载.env.local（本地开发环境配置，用于 Docker）
+            env_file = ".env.local"
+            # 运行环境不为空时按命令行参数加载对应.env文件
+            if run_env != "":
+                env_file = f".env.{run_env}"
+        
         # 加载配置
         load_dotenv(env_file)
 
@@ -258,3 +288,5 @@ RedisConfig = get_config.get_redis_config()
 GenConfig = get_config.get_gen_config()
 # 上传配置
 UploadConfig = get_config.get_upload_config()
+# 源数据库配置
+SourceDataBaseConfig = get_config.get_source_database_config()

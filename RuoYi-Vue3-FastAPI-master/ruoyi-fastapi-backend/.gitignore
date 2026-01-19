@@ -37,6 +37,7 @@ ENV/
 .env.prod
 .env.local
 .env.*.local
+.env.dev
 
 # 日志文件
 logs/
@@ -75,3 +76,4 @@ backup/*.bak
 # 临时文件
 *.tmp
 *.temp
+.env.run
